@@ -18,18 +18,80 @@ class OrdersTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['items.product', 'items.variant', 'items.stock', 'product', 'variant', 'stock']))
             ->columns([
                 TextColumn::make('order_code')->label('Kode')->searchable()->copyable(),
-                TextColumn::make('product.name')->label('Produk')->searchable(),
-                TextColumn::make('variant.name')->label('Paket')->badge(),
+                TextColumn::make('product.name')
+                    ->label('Produk')
+                    ->searchable()
+                    ->formatStateUsing(function ($state, $record) {
+                        $count = $record->items()->count();
+                        if ($count <= 1) {
+                            return $state ?: ($record->product?->name ?? '—');
+                        }
+                        $names = $record->items()->with('product')->get()
+                            ->map(fn ($i) => $i->product?->name)
+                            ->filter()
+                            ->unique()
+                            ->take(2)
+                            ->implode(', ');
+
+                        return $names.' +'.($count - 2 > 0 ? ($count - 2).' lain' : '').' ('.$count.' item)';
+                    })
+                    ->wrap(),
+                TextColumn::make('variant.name')
+                    ->label('Paket')
+                    ->badge()
+                    ->formatStateUsing(function ($state, $record) {
+                        $items = $record->items;
+                        if ($items->isEmpty()) {
+                            return $state ?: ($record->variant?->name ?? '—');
+                        }
+                        if ($items->count() === 1) {
+                            return $items->first()->variant?->name ?? '—';
+                        }
+
+                        return $items->count().' varian';
+                    }),
                 TextColumn::make('customer_email')->label('Email Pembeli')->searchable()->copyable(),
                 TextColumn::make('customer_phone')->label('No HP Pembeli')->searchable()->copyable()->toggleable(),
                 TextColumn::make('stock.email_or_phone')
                     ->label('Akun Terkirim')
                     ->copyable()
                     ->placeholder('— belum dikirim —')
-                    ->color(fn ($state) => $state ? 'success' : 'warning')
-                    ->tooltip(fn ($record) => $record?->stock_id ? 'Stock #'.$record->stock_id : null),
+                    ->formatStateUsing(function ($state, $record) {
+                        $items = $record->items()->with('stock')->get();
+                        if ($items->isNotEmpty()) {
+                            $delivered = $items->filter(fn ($i) => $i->stock !== null);
+                            if ($delivered->isEmpty()) {
+                                return null;
+                            }
+                            if ($delivered->count() === 1) {
+                                return $delivered->first()->stock->email_or_phone ?? '—';
+                            }
+
+                            return $delivered->count().'/'.$items->count().' akun';
+                        }
+
+                        return $state;
+                    })
+                    ->color(function ($record) {
+                        $items = $record->items;
+                        if ($items->isNotEmpty()) {
+                            $allDelivered = $items->every(fn ($i) => $i->stock_id !== null);
+
+                            return $allDelivered ? 'success' : 'warning';
+                        }
+
+                        return $record?->stock_id ? 'success' : 'warning';
+                    })
+                    ->tooltip(function ($record) {
+                        if ($record->items->isNotEmpty()) {
+                            return 'Multi-item order — buka detail order untuk lihat semua akun';
+                        }
+
+                        return $record?->stock_id ? 'Stock #'.$record->stock_id : null;
+                    }),
                 TextColumn::make('total_payment')
                     ->label('Total')
                     ->money('IDR', locale: 'id')

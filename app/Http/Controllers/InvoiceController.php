@@ -18,7 +18,7 @@ class InvoiceController extends Controller
      */
     public function show(Request $request, string $orderCode): View
     {
-        $order = Order::with(['product', 'variant', 'stock'])
+        $order = Order::with(['product', 'variant', 'stock', 'items.product', 'items.variant', 'items.stock'])
             ->where('order_code', $orderCode)
             ->firstOrFail();
 
@@ -45,6 +45,7 @@ class InvoiceController extends Controller
         return view('invoice', [
             'order' => $order,
             'credentials' => $this->decryptedCredentials($order),
+            'itemCredentials' => $this->itemCredentials($order),
         ]);
     }
 
@@ -65,5 +66,32 @@ class InvoiceController extends Controller
             'password' => $order->stock->password,
             'additional_info' => $order->stock->additional_info,
         ];
+    }
+
+    /**
+     * Untuk order multi-item: ekstrak kredensial per OrderItem agar invoice bisa
+     * tampilkan SEMUA akun yang sudah ter-assign (termasuk produk + variant
+     * masing-masing).
+     *
+     * @return array<int, array{product:string, variant:string, qty:int, line_total:int, email_or_phone:?string, password:?string, additional_info:?string, delivered:bool}>
+     */
+    protected function itemCredentials(Order $order): array
+    {
+        if (! $order->isPaid() || $order->items->isEmpty()) {
+            return [];
+        }
+
+        return $order->items->map(function ($item) {
+            return [
+                'product' => $item->product?->name ?? '—',
+                'variant' => $item->variant?->name ?? '—',
+                'qty' => max(1, (int) $item->qty),
+                'line_total' => $item->lineTotal(),
+                'email_or_phone' => $item->stock?->email_or_phone,
+                'password' => $item->stock?->password,
+                'additional_info' => $item->stock?->additional_info,
+                'delivered' => $item->stock !== null,
+            ];
+        })->all();
     }
 }

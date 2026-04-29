@@ -107,11 +107,12 @@
                                     <a href="{{ route('checkout.show', [$product, $variant]) }}"
                                        class="inline-flex justify-center rounded-xl btn-brand font-semibold px-4 py-2.5 text-sm">Beli Sekarang</a>
                                     @auth
-                                        <form method="POST" action="{{ route('cart.add') }}">
-                                            @csrf
-                                            <input type="hidden" name="product_variant_id" value="{{ $variant->id }}">
-                                            <button class="w-full rounded-xl border border-brand text-brand font-semibold px-4 py-2 text-xs hover:bg-brand hover:text-white transition">+ Keranjang</button>
-                                        </form>
+                                        <button type="button"
+                                                data-add-to-cart
+                                                data-variant-id="{{ $variant->id }}"
+                                                class="w-full rounded-xl border border-brand text-brand font-semibold px-4 py-2 text-xs hover:bg-brand hover:text-white transition">
+                                            + Keranjang
+                                        </button>
                                     @else
                                         <a href="{{ route('login') }}" class="text-[10px] text-slate-400 text-center hover:text-brand">Login untuk pakai keranjang</a>
                                     @endauth

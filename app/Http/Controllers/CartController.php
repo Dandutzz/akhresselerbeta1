@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Voucher;
 use App\Services\PakasirService;
 use App\Support\Audit;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -39,7 +40,7 @@ class CartController extends Controller
         return view('cart.index', compact('items'));
     }
 
-    public function add(Request $request): RedirectResponse
+    public function add(Request $request): RedirectResponse|JsonResponse
     {
         $data = $request->validate([
             'product_variant_id' => ['required', 'integer', 'exists:product_variants,id'],
@@ -60,8 +61,70 @@ class CartController extends Controller
         $item->quantity = min(10, ($item->quantity ?? 0) + (int) ($data['quantity'] ?? 1));
         $item->save();
 
-        return redirect()->route('cart.index')
-            ->with('success', "{$variant->product?->name} ({$variant->name}) ditambahkan ke keranjang.");
+        $message = "{$variant->product?->name} ({$variant->name}) ditambahkan ke keranjang.";
+
+        if ($request->wantsJson() || $request->boolean('json')) {
+            return response()->json([
+                'ok' => true,
+                'message' => $message,
+                'cart' => $this->cartSummary(),
+            ]);
+        }
+
+        return redirect()->route('cart.index')->with('success', $message);
+    }
+
+    /**
+     * GET /keranjang/summary — JSON summary cart untuk popup mini.
+     */
+    public function summary(): JsonResponse
+    {
+        return response()->json($this->cartSummary());
+    }
+
+    /**
+     * @return array{count:int,subtotal:int,subtotal_formatted:string,items:array<int,array<string,mixed>>}
+     */
+    protected function cartSummary(): array
+    {
+        $items = CartItem::with(['product', 'variant'])
+            ->where('user_id', Auth::id())
+            ->latest()
+            ->get();
+
+        $count = 0;
+        $subtotal = 0;
+        $rows = [];
+        foreach ($items as $cart) {
+            if (! $cart->variant) {
+                continue;
+            }
+            $unit = (int) $cart->variant->effectivePrice();
+            $qty = max(1, (int) $cart->quantity);
+            $line = $unit * $qty;
+            $count += $qty;
+            $subtotal += $line;
+            $rows[] = [
+                'id' => $cart->id,
+                'product' => $cart->product?->name,
+                'variant' => $cart->variant?->name,
+                'qty' => $qty,
+                'unit_price' => $unit,
+                'unit_price_formatted' => 'Rp '.number_format($unit, 0, ',', '.'),
+                'line_total' => $line,
+                'line_total_formatted' => 'Rp '.number_format($line, 0, ',', '.'),
+                'remove_url' => route('cart.destroy', $cart->id),
+            ];
+        }
+
+        return [
+            'count' => $count,
+            'distinct' => count($rows),
+            'subtotal' => $subtotal,
+            'subtotal_formatted' => 'Rp '.number_format($subtotal, 0, ',', '.'),
+            'items' => $rows,
+            'cart_url' => route('cart.index'),
+        ];
     }
 
     public function update(Request $request, CartItem $item): RedirectResponse
@@ -168,15 +231,20 @@ class CartController extends Controller
                 ),
             ]);
 
+            // Expand: untuk qty > 1 buat N OrderItem dengan qty=1 masing-masing,
+            // supaya admin bisa input akun terpisah per pcs (1 pesanan 2 pcs =
+            // butuh 2 akun terpisah, bukan 1 akun untuk dua-duanya).
             foreach ($items as $cart) {
                 $info = $lineTotals[$cart->id];
-                OrderItem::create([
-                    'order_id' => $order->id,
-                    'product_id' => $cart->variant->product_id,
-                    'product_variant_id' => $cart->variant->id,
-                    'qty' => $info['qty'],
-                    'unit_price' => $info['unit'],
-                ]);
+                for ($i = 0; $i < $info['qty']; $i++) {
+                    OrderItem::create([
+                        'order_id' => $order->id,
+                        'product_id' => $cart->variant->product_id,
+                        'product_variant_id' => $cart->variant->id,
+                        'qty' => 1,
+                        'unit_price' => $info['unit'],
+                    ]);
+                }
             }
 
             if ($voucher) {

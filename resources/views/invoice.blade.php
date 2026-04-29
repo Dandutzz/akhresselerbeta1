@@ -39,19 +39,44 @@
                 </span>
             </div>
 
+            @php $items = $order->items; @endphp
+
+            @if ($items->count() > 1)
+                <div class="mb-4 border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                    <div class="px-4 py-2 bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">Item Pesanan ({{ $items->count() }})</div>
+                    @foreach ($items as $it)
+                        <div class="px-4 py-3 flex items-start justify-between gap-3">
+                            <div class="flex-1">
+                                <div class="text-sm font-bold text-slate-900">{{ $it->product?->name ?? '—' }}</div>
+                                <div class="text-xs text-slate-500">Paket: {{ $it->variant?->name ?? '—' }} · Qty {{ max(1, (int) $it->qty) }}</div>
+                            </div>
+                            <div class="text-sm font-extrabold text-slate-900 whitespace-nowrap">Rp {{ number_format($it->lineTotal(), 0, ',', '.') }}</div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
             <dl class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                    <dt class="text-slate-500">Produk</dt>
-                    <dd class="font-semibold text-slate-800">{{ $order->product?->name }}</dd>
-                </div>
-                <div class="flex justify-between">
-                    <dt class="text-slate-500">Paket</dt>
-                    <dd class="font-semibold text-slate-800">{{ $order->variant?->name }}</dd>
-                </div>
+                @if ($items->count() <= 1)
+                    <div class="flex justify-between">
+                        <dt class="text-slate-500">Produk</dt>
+                        <dd class="font-semibold text-slate-800">{{ $order->product?->name }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-slate-500">Paket</dt>
+                        <dd class="font-semibold text-slate-800">{{ $order->variant?->name }}</dd>
+                    </div>
+                @endif
                 <div class="flex justify-between">
                     <dt class="text-slate-500">Email pembeli</dt>
                     <dd class="font-semibold text-slate-800">{{ $order->customer_email }}</dd>
                 </div>
+                @if ($order->discount_amount > 0)
+                    <div class="flex justify-between">
+                        <dt class="text-slate-500">Diskon voucher</dt>
+                        <dd class="font-semibold text-emerald-700">- Rp {{ number_format($order->discount_amount, 0, ',', '.') }}</dd>
+                    </div>
+                @endif
                 <div class="flex justify-between border-t border-slate-100 pt-2 mt-2">
                     <dt class="text-slate-500">Total bayar</dt>
                     <dd class="font-extrabold text-slate-900">
@@ -80,7 +105,64 @@
             @endif
 
             @if ($order->isPaid())
-                @if ($credentials)
+                @if (! empty($itemCredentials))
+                    {{-- Multi-item: tampilkan kredensial per item, label produk + varian.
+                         Pending tampil INLINE sebagai "Menunggu data" supaya jelas
+                         status tiap item. --}}
+                    @php
+                        $hasAnyDelivered = collect($itemCredentials)->where('delivered', true)->isNotEmpty();
+                        $hasAnyPending = collect($itemCredentials)->where('delivered', false)->isNotEmpty();
+                    @endphp
+                    <div class="mt-6 {{ $hasAnyDelivered ? 'bg-green-50 border border-green-200' : 'bg-blue-50 border border-blue-200' }} rounded-xl p-4">
+                        <div class="font-extrabold {{ $hasAnyDelivered ? 'text-green-900' : 'text-blue-900' }} mb-3">
+                            @if ($hasAnyDelivered && $hasAnyPending)
+                                🎉 Sebagian akun siap dipakai · sebagian masih menunggu admin
+                            @elseif ($hasAnyDelivered)
+                                🎉 Akun kamu siap dipakai!
+                            @else
+                                ⏳ Menunggu admin mengirim akun
+                            @endif
+                        </div>
+                        <div class="space-y-3">
+                            @foreach ($itemCredentials as $idx => $cred)
+                                @if ($cred['delivered'])
+                                    <div class="border border-green-200 bg-white rounded-lg p-3">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <div class="text-xs font-bold text-green-800">#{{ $idx + 1 }} {{ $cred['product'] }} — {{ $cred['variant'] }}</div>
+                                            <span class="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-bold">SIAP</span>
+                                        </div>
+                                        <div class="space-y-2 text-sm">
+                                            <div>
+                                                <div class="text-[11px] text-green-700 font-semibold uppercase">Email / No HP</div>
+                                                <code class="block bg-green-50 border border-green-200 rounded-lg px-3 py-2 mt-1 select-all text-sm break-all">{{ $cred['email_or_phone'] }}</code>
+                                            </div>
+                                            <div>
+                                                <div class="text-[11px] text-green-700 font-semibold uppercase">Password</div>
+                                                <code class="block bg-green-50 border border-green-200 rounded-lg px-3 py-2 mt-1 select-all text-sm break-all">{{ $cred['password'] }}</code>
+                                            </div>
+                                            @if (! empty($cred['additional_info']))
+                                                <div>
+                                                    <div class="text-[11px] text-green-700 font-semibold uppercase">Info tambahan</div>
+                                                    <pre class="bg-green-50 border border-green-200 rounded-lg px-3 py-2 mt-1 text-xs whitespace-pre-wrap">{{ $cred['additional_info'] }}</pre>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @else
+                                    <div class="border border-amber-200 bg-amber-50 rounded-lg p-3">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <div class="text-xs font-bold text-amber-800">#{{ $idx + 1 }} {{ $cred['product'] }} — {{ $cred['variant'] }}</div>
+                                            <span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">⏳ MENUNGGU DATA</span>
+                                        </div>
+                                        <div class="text-xs text-amber-800">Akun untuk item ini sedang diproses admin secara manual. Halaman ini akan menampilkan kredensial begitu admin selesai mengirim.</div>
+                                    </div>
+                                @endif
+                            @endforeach
+                        </div>
+                        <p class="mt-3 text-xs {{ $hasAnyDelivered ? 'text-green-800' : 'text-blue-800' }}">Simpan halaman ini atau bookmark URL invoice ini — kredensial akan tetap muncul di sini.</p>
+                    </div>
+                @elseif ($credentials)
+                    {{-- Legacy single-item path --}}
                     <div class="mt-6 bg-green-50 border border-green-200 rounded-xl p-4">
                         <div class="font-extrabold text-green-900 mb-2">🎉 Akun kamu siap dipakai!</div>
                         <div class="space-y-2 text-sm">
@@ -99,9 +181,7 @@
                                 </div>
                             @endif
                         </div>
-                        <p class="mt-3 text-xs text-green-800">
-                            Simpan halaman ini atau bookmark URL invoice ini untuk akses kredensial di lain waktu.
-                        </p>
+                        <p class="mt-3 text-xs text-green-800">Simpan halaman ini atau bookmark URL invoice ini untuk akses kredensial di lain waktu.</p>
                     </div>
                 @else
                     <div class="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900">
@@ -118,7 +198,13 @@
                 if ($waNumber !== '' && $waNumber[0] === '0') {
                     $waNumber = '62'.substr($waNumber, 1);
                 }
-                $waText = 'Halo admin, saya telah melakukan pembelian dengan ID order *'.$order->order_code.'*. Mohon dibantu ya.';
+                if ($order->isPending()) {
+                    $waText = 'Halo admin, saya ada kendala dalam pembayaran dengan ID invoice *'.$order->order_code.'*. Mohon dibantu ya.';
+                } elseif ($order->isPaid()) {
+                    $waText = 'Halo admin, saya sudah melakukan pembayaran dengan ID invoice *'.$order->order_code.'*. Mohon segera diproses.';
+                } else {
+                    $waText = 'Halo admin, saya butuh bantuan terkait order *'.$order->order_code.'*.';
+                }
                 $waUrl = $waNumber !== ''
                     ? 'https://wa.me/'.$waNumber.'?text='.rawurlencode($waText)
                     : null;

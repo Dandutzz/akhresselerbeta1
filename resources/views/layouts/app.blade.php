@@ -166,6 +166,10 @@
 })();
 </script>
 
+@auth
+    @include('partials.mini-cart')
+@endauth
+
 @stack('scripts')
 </body>
 </html>
