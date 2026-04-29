@@ -8,11 +8,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProductVariant extends Model
 {
+    public const SHARE_SHARING = 'sharing';
+
+    public const SHARE_PRIVATE = 'private';
+
+    public const SHARE_SHARING_ANTILIMIT = 'sharing_antilimit';
+
     protected $fillable = [
         'product_id',
         'name',
         'price',
         'is_auto_send',
+        'warranty_days',
+        'share_type',
     ];
 
     protected function casts(): array
@@ -20,7 +28,18 @@ class ProductVariant extends Model
         return [
             'price' => 'integer',
             'is_auto_send' => 'boolean',
+            'warranty_days' => 'integer',
         ];
+    }
+
+    public function shareTypeLabel(): ?string
+    {
+        return match ($this->share_type) {
+            self::SHARE_SHARING => 'Sharing',
+            self::SHARE_PRIVATE => 'Private',
+            self::SHARE_SHARING_ANTILIMIT => 'Sharing Antilimit',
+            default => null,
+        };
     }
 
     /**

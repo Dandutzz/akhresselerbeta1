@@ -85,8 +85,21 @@ class FrontController extends Controller
             }]);
         }]);
 
+        $reviews = $product->reviews()
+            ->approved()
+            ->latest()
+            ->limit(20)
+            ->get();
+
+        $reviewStats = [
+            'count' => $reviews->count(),
+            'avg' => $reviews->count() ? round($reviews->avg('rating'), 1) : null,
+        ];
+
         return view('product', [
             'product' => $product,
+            'reviews' => $reviews,
+            'reviewStats' => $reviewStats,
         ]);
     }
 

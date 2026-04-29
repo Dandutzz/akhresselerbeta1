@@ -41,8 +41,12 @@
                     @if ($product->is_best_seller)
                         <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 px-2 py-0.5 font-semibold">★ Best Seller</span>
                     @endif
-                    @if ($product->sold_count)
-                        <span>· {{ number_format($product->sold_count, 0, ',', '.') }} terjual</span>
+                    @php $displaySold = $product->displaySoldCount(); @endphp
+                    @if ($displaySold > 0)
+                        <span>· {{ number_format($displaySold, 0, ',', '.') }} terjual</span>
+                    @endif
+                    @if (! empty($reviewStats['avg']))
+                        <span>· ⭐ {{ $reviewStats['avg'] }} ({{ $reviewStats['count'] }} ulasan)</span>
                     @endif
                 </div>
 
@@ -61,10 +65,23 @@
                         @endphp
                         <div class="px-5 py-4 flex items-center gap-4">
                             <div class="flex-1">
-                                <div class="font-semibold flex items-center gap-2">
+                                <div class="font-semibold flex items-center gap-2 flex-wrap">
                                     {{ $variant->name }}
                                     @if ($fs)
                                         <span class="inline-flex items-center text-[10px] font-bold rounded px-1.5 py-0.5 bg-rose-600 text-white">FLASH -{{ $fs->discountPercent() }}%</span>
+                                    @endif
+                                    @if ($variant->warranty_days)
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5 bg-emerald-50 text-emerald-700">🛡 Garansi {{ $variant->warranty_days }} Hari</span>
+                                    @endif
+                                    @if ($variant->shareTypeLabel())
+                                        @php
+                                            $shareCls = match ($variant->share_type) {
+                                                'private' => 'bg-violet-50 text-violet-700',
+                                                'sharing_antilimit' => 'bg-cyan-50 text-cyan-700',
+                                                default => 'bg-sky-50 text-sky-700',
+                                            };
+                                        @endphp
+                                        <span class="inline-flex items-center text-[10px] font-bold rounded-full px-2 py-0.5 {{ $shareCls }}">{{ $variant->shareTypeLabel() }}</span>
                                     @endif
                                 </div>
                                 <div class="text-xs text-slate-500 mt-0.5">
@@ -83,12 +100,21 @@
                                     <div class="font-extrabold">Rp {{ number_format($effective, 0, ',', '.') }}</div>
                                 @endif
                             </div>
-                            <div>
+                            <div class="flex flex-col gap-1">
                                 @if ($isOOS)
                                     <button type="button" disabled class="rounded-xl bg-slate-100 text-slate-400 cursor-not-allowed font-semibold px-4 py-2.5 text-sm">Habis</button>
                                 @else
                                     <a href="{{ route('checkout.show', [$product, $variant]) }}"
-                                       class="inline-flex rounded-xl btn-brand font-semibold px-4 py-2.5 text-sm">Beli Sekarang</a>
+                                       class="inline-flex justify-center rounded-xl btn-brand font-semibold px-4 py-2.5 text-sm">Beli Sekarang</a>
+                                    @auth
+                                        <form method="POST" action="{{ route('cart.add') }}">
+                                            @csrf
+                                            <input type="hidden" name="product_variant_id" value="{{ $variant->id }}">
+                                            <button class="w-full rounded-xl border border-brand text-brand font-semibold px-4 py-2 text-xs hover:bg-brand hover:text-white transition">+ Keranjang</button>
+                                        </form>
+                                    @else
+                                        <a href="{{ route('login') }}" class="text-[10px] text-slate-400 text-center hover:text-brand">Login untuk pakai keranjang</a>
+                                    @endauth
                                 @endif
                             </div>
                         </div>
@@ -127,6 +153,39 @@
                     <span class="inline-flex items-center gap-1">⚡ Auto delivery</span>
                 </div>
             </div>
+        </div>
+
+        {{-- Reviews dari pelanggan --}}
+        <div class="mt-12">
+            <h2 class="text-2xl font-extrabold tracking-tight">Ulasan Pelanggan</h2>
+            <div class="mt-2 flex items-center gap-2 text-sm text-slate-500">
+                @if ($reviewStats['avg'])
+                    <span class="text-amber-500 font-bold">⭐ {{ $reviewStats['avg'] }}</span>
+                    <span>·</span>
+                    <span>{{ $reviewStats['count'] }} ulasan</span>
+                @else
+                    <span>Belum ada ulasan untuk produk ini.</span>
+                @endif
+            </div>
+
+            @if ($reviews->isNotEmpty())
+                <div class="mt-5 grid md:grid-cols-2 gap-4">
+                    @foreach ($reviews as $review)
+                        <div class="rounded-2xl bg-white border border-slate-200 p-5">
+                            <div class="flex items-center justify-between">
+                                <div class="font-bold text-slate-900">{{ $review->reviewer_name }}</div>
+                                <div class="text-amber-500 text-sm">
+                                    @for ($i = 1; $i <= 5; $i++){{ $i <= $review->rating ? '★' : '☆' }}@endfor
+                                </div>
+                            </div>
+                            <div class="text-[11px] text-slate-400 mt-0.5">{{ $review->created_at->format('d M Y') }}</div>
+                            @if ($review->comment)
+                                <p class="mt-3 text-sm text-slate-700">{{ $review->comment }}</p>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            @endif
         </div>
     </div>
 </section>

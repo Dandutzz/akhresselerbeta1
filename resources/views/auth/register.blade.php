@@ -26,8 +26,8 @@
                     @error('email')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5" for="phone">Nomor WhatsApp <span class="text-slate-400 font-normal">(opsional)</span></label>
-                    <input type="text" id="phone" name="phone" value="{{ old('phone') }}"
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5" for="phone">Nomor HP / WhatsApp <span class="text-rose-500">*</span></label>
+                    <input type="text" id="phone" name="phone" required value="{{ old('phone') }}"
                            class="w-full rounded-xl border border-slate-200 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand"
                            placeholder="08xxxxxxxxxx">
                     @error('phone')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror

@@ -32,6 +32,12 @@ class SiteSetting extends Model
         'fonnte_credentials_template',
         'fonnte_admin_number',
         'fonnte_webhook_secret',
+        'fake_sold_enabled',
+        'floating_notif_enabled',
+        'floating_notif_use_real',
+        'floating_notif_use_fake',
+        'floating_notif_interval_min',
+        'floating_notif_interval_max',
     ];
 
     /** Fonnte API key disimpan terenkripsi (AES-256-CBC) — sensitive credential. */
@@ -40,6 +46,12 @@ class SiteSetting extends Model
         return [
             'fonnte_api_key' => 'encrypted',
             'fonnte_auto_send_credentials' => 'boolean',
+            'fake_sold_enabled' => 'boolean',
+            'floating_notif_enabled' => 'boolean',
+            'floating_notif_use_real' => 'boolean',
+            'floating_notif_use_fake' => 'boolean',
+            'floating_notif_interval_min' => 'integer',
+            'floating_notif_interval_max' => 'integer',
         ];
     }
 

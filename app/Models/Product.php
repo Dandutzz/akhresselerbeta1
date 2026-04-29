@@ -22,6 +22,7 @@ class Product extends Model
         'is_auto_send',
         'is_best_seller',
         'sold_count',
+        'fake_sold_count',
         'category_id',
     ];
 
@@ -32,7 +33,30 @@ class Product extends Model
             'is_auto_send' => 'boolean',
             'is_best_seller' => 'boolean',
             'sold_count' => 'integer',
+            'fake_sold_count' => 'integer',
         ];
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    /**
+     * Total terjual yang ditampilkan ke publik. Bila fake_sold_enabled aktif,
+     * tambahkan offset dari fake_sold_count. Penambahan dijaga agar tidak
+     * pernah turun (real_sold hanya naik; admin hanya boleh menaikkan
+     * fake_sold_count).
+     */
+    public function displaySoldCount(): int
+    {
+        $base = (int) $this->sold_count;
+        $site = SiteSetting::current();
+        if (($site->fake_sold_enabled ?? false)) {
+            $base += (int) ($this->fake_sold_count ?? 0);
+        }
+
+        return max(0, $base);
     }
 
     public function variants(): HasMany

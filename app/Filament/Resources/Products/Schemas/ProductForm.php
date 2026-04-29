@@ -68,6 +68,13 @@ class ProductForm
                     ->label('Tandai sebagai Best Seller')
                     ->default(false),
 
+                TextInput::make('fake_sold_count')
+                    ->label('Fake Sold Count (sosial proof)')
+                    ->numeric()
+                    ->minValue(0)
+                    ->default(0)
+                    ->helperText('Offset jumlah terjual palsu. Akan ditambahkan ke sold_count asli saat ditampilkan ke publik. Hanya naikkan, jangan turunkan, agar konsisten. Aktifkan toggle global di Site Settings.'),
+
                 Repeater::make('variants')
                     ->label('Paket / Varian')
                     ->relationship()
@@ -91,6 +98,22 @@ class ProductForm
                             ->placeholder('Default (ikut produk)')
                             ->dehydrateStateUsing(fn ($state) => ($state === '' || $state === null) ? null : (bool) $state)
                             ->columnSpan(2),
+
+                        TextInput::make('warranty_days')
+                            ->label('Garansi (hari)')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(3650)
+                            ->helperText('Kosongkan / 0 = tanpa garansi. Akan tampil sebagai badge di halaman produk.'),
+                        Select::make('share_type')
+                            ->label('Tipe Akun')
+                            ->options([
+                                'sharing' => 'Sharing',
+                                'private' => 'Private',
+                                'sharing_antilimit' => 'Sharing Antilimit',
+                            ])
+                            ->placeholder('— Tidak Ada Badge —')
+                            ->helperText('Tampil sebagai badge sharing/private di halaman produk.'),
                     ])
                     ->columns(2)
                     ->columnSpanFull()

@@ -48,9 +48,15 @@
                         <td class="px-5 py-3 font-semibold">Rp {{ number_format($order->total_payment, 0, ',', '.') }}</td>
                         <td class="px-5 py-3"><span class="inline-flex items-center gap-1 rounded-full text-[11px] font-bold px-2.5 py-1 {{ $statusClass }}">{{ $statusLabel }}</span></td>
                         <td class="px-5 py-3 text-slate-600">{{ $order->created_at->format('d M Y, H:i') }}</td>
-                        <td class="px-5 py-3 text-right">
+                        <td class="px-5 py-3 text-right whitespace-nowrap">
                             <a href="{{ route('invoice.show', $order->order_code) }}"
-                               class="text-brand font-semibold text-xs hover:underline">Detail →</a>
+                               class="text-brand font-semibold text-xs hover:underline">Detail</a>
+                            @if ($order->isPaid() && ! $order->review()->exists())
+                                <a href="{{ route('account.reviews.create', $order->order_code) }}"
+                                   class="ml-2 text-amber-600 font-semibold text-xs hover:underline">★ Review</a>
+                            @elseif ($order->review()->exists())
+                                <span class="ml-2 text-slate-400 text-xs">Sudah direview</span>
+                            @endif
                         </td>
                     </tr>
                 @endforeach

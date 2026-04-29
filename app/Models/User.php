@@ -53,6 +53,16 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(Order::class);
     }
 
+    public function cartItems(): HasMany
+    {
+        return $this->hasMany(CartItem::class);
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
     /**
      * Klaim semua order tamu (user_id null) yang dipakai dengan email yang sama.
      * Dipanggil saat user baru register atau login pertama kali untuk

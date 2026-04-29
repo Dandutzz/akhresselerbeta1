@@ -2,11 +2,14 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\FloatingNotificationController;
 use App\Http\Controllers\FonnteWebhookController;
 use App\Http\Controllers\FrontController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PakasirWebhookController;
+use App\Http\Controllers\ReviewController;
 use Illuminate\Support\Facades\Route;
 
 // ======== Publik (frontend toko) ========
@@ -77,4 +80,24 @@ Route::middleware('auth')->prefix('akun')->name('account.')->group(function () {
     Route::get('/orders', [AccountController::class, 'orders'])->name('orders.index');
     Route::get('/profil', [AccountController::class, 'profile'])->name('profile');
     Route::post('/profil', [AccountController::class, 'updateProfile'])->name('profile.update');
+
+    // Review produk untuk order yg sudah PAID
+    Route::get('/orders/{orderCode}/review', [ReviewController::class, 'create'])->name('reviews.create');
+    Route::post('/orders/{orderCode}/review', [ReviewController::class, 'store'])
+        ->middleware('throttle:10,1')->name('reviews.store');
 });
+
+// ======== Cart (hanya user login — guest pakai checkout instan) ========
+Route::middleware('auth')->prefix('keranjang')->name('cart.')->group(function () {
+    Route::get('/', [CartController::class, 'index'])->name('index');
+    Route::post('/add', [CartController::class, 'add'])->middleware('throttle:30,1')->name('add');
+    Route::post('/checkout', [CartController::class, 'checkoutAll'])
+        ->middleware('throttle:10,1')->name('checkout');
+    Route::patch('/{item}', [CartController::class, 'update'])->name('update');
+    Route::delete('/{item}', [CartController::class, 'destroy'])->name('destroy');
+});
+
+// ======== Floating notification feed (publik, JSON) ========
+Route::get('/api/floating-notifications', [FloatingNotificationController::class, 'index'])
+    ->middleware('throttle:60,1')
+    ->name('api.floating-notifications');

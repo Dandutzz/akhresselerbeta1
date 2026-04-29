@@ -133,6 +133,42 @@ class ManageSiteSettings extends Page implements HasForms
                             ->columnSpanFull(),
                     ]),
 
+                Section::make('Sosial Proof — Fake Terjual')
+                    ->description('Jumlah terjual palsu dijumlahkan dengan terjual asli. Atur per produk di Resource Produk → Fake Sold Count. Hanya naikkan secara konsisten — jangan diturunkan.')
+                    ->columns(1)
+                    ->schema([
+                        Toggle::make('fake_sold_enabled')
+                            ->label('Aktifkan Fake Terjual')
+                            ->helperText('Kalau ON, jumlah terjual yang ditampilkan ke publik = sold_count + fake_sold_count produk.')
+                            ->default(false),
+                    ]),
+
+                Section::make('Notifikasi Mengambang (Floating Notif)')
+                    ->description('Toast kecil di pojok kiri bawah yang menampilkan "User X baru saja membeli produk Y". Dapat berasal dari order asli ATAU order palsu. Notif palsu hanya muncul untuk produk yang stoknya masih tersedia agar tidak menipu user.')
+                    ->columns(2)
+                    ->schema([
+                        Toggle::make('floating_notif_enabled')
+                            ->label('Aktifkan Notif Mengambang')
+                            ->columnSpanFull()
+                            ->default(false),
+                        Toggle::make('floating_notif_use_real')
+                            ->label('Sertakan order ASLI (24 jam terakhir)')
+                            ->default(true),
+                        Toggle::make('floating_notif_use_fake')
+                            ->label('Sertakan order PALSU (sinkron stok)')
+                            ->default(true),
+                        TextInput::make('floating_notif_interval_min')
+                            ->label('Interval min (detik)')
+                            ->numeric()
+                            ->minValue(5)
+                            ->default(20),
+                        TextInput::make('floating_notif_interval_max')
+                            ->label('Interval max (detik)')
+                            ->numeric()
+                            ->minValue(10)
+                            ->default(60),
+                    ]),
+
                 Section::make('Konten Halaman Statis')
                     ->columns(1)
                     ->schema([

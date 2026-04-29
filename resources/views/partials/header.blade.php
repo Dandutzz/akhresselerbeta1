@@ -24,6 +24,14 @@
 
         <div class="hidden md:flex items-center gap-2">
             @auth
+                @php $cartCount = \App\Models\CartItem::where('user_id', auth()->id())->sum('quantity'); @endphp
+                <a href="{{ route('cart.index') }}"
+                   class="relative inline-flex items-center justify-center rounded-full w-10 h-10 border border-slate-200 hover:border-brand hover:text-brand text-slate-700 transition">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>
+                    @if ($cartCount > 0)
+                        <span class="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-bold rounded-full px-1.5 min-w-[18px] h-[18px] inline-flex items-center justify-center">{{ $cartCount }}</span>
+                    @endif
+                </a>
                 <a href="{{ route('account.index') }}"
                    class="inline-flex items-center gap-2 rounded-full text-sm font-semibold px-4 py-2 border border-slate-200 hover:border-brand hover:text-brand text-slate-700 transition">
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
@@ -66,6 +74,7 @@
             <hr class="my-2 border-slate-200">
             @auth
                 <a href="{{ route('account.index') }}" class="py-2 font-semibold">Akun Saya</a>
+                <a href="{{ route('cart.index') }}" class="py-2">Keranjang</a>
                 <a href="{{ route('account.orders.index') }}" class="py-2">History Pesanan</a>
                 <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="py-2 text-rose-600 text-left w-full">Keluar</button></form>
             @else

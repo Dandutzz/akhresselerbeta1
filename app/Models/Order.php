@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
 {
@@ -25,9 +27,11 @@ class Order extends Model
         'product_id',
         'product_variant_id',
         'stock_id',
+        'voucher_id',
         'customer_email',
         'customer_phone',
         'amount',
+        'discount_amount',
         'fee',
         'total_payment',
         'payment_method',
@@ -41,11 +45,22 @@ class Order extends Model
     {
         return [
             'amount' => 'integer',
+            'discount_amount' => 'integer',
             'fee' => 'integer',
             'total_payment' => 'integer',
             'paid_at' => 'datetime',
             'expired_at' => 'datetime',
         ];
+    }
+
+    public function voucher(): BelongsTo
+    {
+        return $this->belongsTo(Voucher::class);
+    }
+
+    public function review(): HasOne
+    {
+        return $this->hasOne(Review::class);
     }
 
     public function user(): BelongsTo
@@ -66,6 +81,20 @@ class Order extends Model
     public function stock(): BelongsTo
     {
         return $this->belongsTo(Stock::class);
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(OrderItem::class);
+    }
+
+    /**
+     * True jika order ini hasil checkout cart (multi-varian dalam 1 transaksi).
+     * Order single-item (instant checkout) cukup punya 1 OrderItem atau 0 (legacy).
+     */
+    public function isCart(): bool
+    {
+        return $this->items()->count() > 1;
     }
 
     public function isPaid(): bool

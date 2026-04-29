@@ -76,6 +76,15 @@
                            class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-brand focus:outline-none focus:ring-2 ring-brand/30">
                 </div>
 
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Kode Voucher <span class="text-slate-400 font-normal">(opsional)</span></label>
+                    <input type="text" name="voucher_code"
+                           value="{{ old('voucher_code') }}"
+                           placeholder="Misal: HEMAT10"
+                           class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm uppercase focus:border-brand focus:outline-none focus:ring-2 ring-brand/30">
+                    <p class="text-xs text-slate-500 mt-1">Punya kode promo? Masukkan untuk dapat diskon.</p>
+                </div>
+
                 <button type="submit" class="w-full rounded-xl btn-brand font-extrabold text-base px-4 py-3 transition">
                     Bayar Sekarang
                 </button>

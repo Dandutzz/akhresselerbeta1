@@ -97,6 +97,75 @@
     </a>
 @endif
 
+{{-- Floating notif (toast mengambang). Toggle di Site Settings admin. --}}
+<div id="floating-notif"
+     class="fixed bottom-24 left-5 z-40 hidden max-w-xs rounded-xl bg-white border border-slate-200 shadow-card px-4 py-3 text-sm">
+    <div class="flex items-start gap-3">
+        <span class="text-2xl">🛍️</span>
+        <div class="flex-1">
+            <div class="font-semibold text-slate-900" data-notif-name></div>
+            <div class="text-xs text-slate-500" data-notif-product></div>
+            <div class="text-[11px] text-slate-400 mt-0.5" data-notif-when></div>
+        </div>
+        <button type="button" class="text-slate-400 hover:text-slate-700 text-lg leading-none" data-notif-close>&times;</button>
+    </div>
+</div>
+<script>
+(function() {
+    const el = document.getElementById('floating-notif');
+    const nameEl = el.querySelector('[data-notif-name]');
+    const prodEl = el.querySelector('[data-notif-product]');
+    const whenEl = el.querySelector('[data-notif-when]');
+    const closeBtn = el.querySelector('[data-notif-close]');
+
+    let items = [];
+    let cfg = { interval_min: 20, interval_max: 60 };
+    let dismissed = false;
+    let queueIdx = 0;
+    let hideTimer = null;
+
+    closeBtn.addEventListener('click', () => {
+        el.classList.add('hidden');
+        dismissed = true;
+    });
+
+    function show(item) {
+        nameEl.textContent = item.name + ' baru saja membeli';
+        prodEl.textContent = item.product;
+        whenEl.textContent = item.when || '';
+        el.classList.remove('hidden');
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => el.classList.add('hidden'), 6000);
+    }
+
+    function pickRandomDelay() {
+        const min = cfg.interval_min || 20;
+        const max = cfg.interval_max || 60;
+        return (Math.floor(Math.random() * (max - min + 1)) + min) * 1000;
+    }
+
+    function loop() {
+        if (dismissed || items.length === 0) return;
+        const item = items[queueIdx % items.length];
+        queueIdx++;
+        show(item);
+        setTimeout(loop, pickRandomDelay());
+    }
+
+    fetch('{{ route('api.floating-notifications') }}', { headers: { Accept: 'application/json' } })
+        .then(r => r.json())
+        .then(data => {
+            if (! data.enabled || ! data.items || data.items.length === 0) return;
+            items = data.items;
+            cfg.interval_min = data.interval_min || 20;
+            cfg.interval_max = data.interval_max || 60;
+            // Tampilkan pertama setelah 4 detik supaya page sempat load.
+            setTimeout(loop, 4000);
+        })
+        .catch(() => {});
+})();
+</script>
+
 @stack('scripts')
 </body>
 </html>

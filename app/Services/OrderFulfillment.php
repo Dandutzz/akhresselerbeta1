@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Models\Flashsale;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Stock;
 use App\Support\Audit;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -40,9 +42,10 @@ class OrderFulfillment
             }
 
             $wasAlreadyPaid = $locked->isPaid();
+            $items = $locked->items()->lockForUpdate()->get();
 
             // Idempotent: kalau sudah paid DAN stok sudah ter-assign, tidak ada yang perlu dikerjakan.
-            if ($wasAlreadyPaid && $locked->stock_id) {
+            if ($wasAlreadyPaid && $this->stockAlreadyAssigned($locked, $items)) {
                 return true;
             }
 
@@ -60,15 +63,6 @@ class OrderFulfillment
                 return false;
             }
 
-            // Pilih stok available paling lama (FIFO) dan kunci baris-nya.
-            // Jalan walaupun order sudah paid (kasus: admin manual mark paid duluan,
-            // baru menambahkan stok — ini "rescue" agar stok tetap auto-assigned).
-            $stock = Stock::where('product_variant_id', $locked->product_variant_id)
-                ->where('is_sold', false)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->first();
-
             if (! $wasAlreadyPaid) {
                 $locked->status = Order::STATUS_PAID;
                 $locked->paid_at = now();
@@ -77,43 +71,26 @@ class OrderFulfillment
                 $locked->payment_method = (string) $context['payment_method'];
             }
 
-            if ($stock) {
-                $stock->is_sold = true;
-                $stock->sold_at = now();
-                $stock->save();
-
-                $locked->stock_id = $stock->id;
-
-                Audit::log('stock.delivered', $locked, [
-                    'stock_id' => $stock->id,
-                    'variant_id' => $locked->product_variant_id,
-                ]);
+            // Assign stok untuk setiap OrderItem (multi-item path) — atau fallback
+            // ke single-item legacy path jika order tidak punya items.
+            if ($items->isNotEmpty()) {
+                $assignedStock = $this->assignStockForItems($locked, $items, $wasAlreadyPaid);
             } else {
-                // Order tetap PAID — admin perlu deliver manual.
-                Audit::log('stock.out_of_stock', $locked, [
-                    'variant_id' => $locked->product_variant_id,
-                    'note' => 'Pembayaran sukses tapi stok otomatis kosong.',
-                ]);
+                $assignedStock = $this->assignStockLegacy($locked, $wasAlreadyPaid);
             }
 
             $locked->save();
-            $assignedStock = (bool) $stock;
 
             // Counter flashsale + sold_count produk hanya di-increment sekali,
             // saat transisi pertama kali ke PAID. Hindari double-count saat
             // re-run untuk rescue stock assignment.
             if (! $wasAlreadyPaid) {
-                if ($locked->product_variant_id) {
-                    $fs = Flashsale::active()
-                        ->where('product_variant_id', $locked->product_variant_id)
-                        ->lockForUpdate()
-                        ->first();
-                    if ($fs && $locked->amount === (int) $fs->flash_price) {
-                        $fs->increment('sold');
+                if ($items->isNotEmpty()) {
+                    foreach ($items as $item) {
+                        $this->incrementCounters($item->product_id, $item->product_variant_id, $item->unit_price, max(1, (int) $item->qty));
                     }
-                }
-                if ($locked->product_id) {
-                    Product::whereKey($locked->product_id)->increment('sold_count');
+                } else {
+                    $this->incrementCounters($locked->product_id, $locked->product_variant_id, (int) $locked->amount, 1);
                 }
 
                 Audit::log('order.paid', $locked, $context);
@@ -125,9 +102,131 @@ class OrderFulfillment
         // Auto-kirim kredensial via Fonnte WA — di luar transaction supaya HTTP call
         // tidak block lock DB. Service handle exception sendiri (return false, gak throw).
         if ($result && $assignedStock) {
-            app(FonnteWhatsApp::class)->sendCredentials($order->fresh(['stock', 'product', 'variant']));
+            $fresh = $order->fresh(['stock', 'product', 'variant', 'items.stock', 'items.product', 'items.variant']);
+            app(FonnteWhatsApp::class)->sendCredentials($fresh);
         }
 
         return $result;
+    }
+
+    /**
+     * @param  Collection<int, OrderItem>  $items
+     */
+    protected function stockAlreadyAssigned(Order $order, $items): bool
+    {
+        if ($items->isEmpty()) {
+            return (bool) $order->stock_id;
+        }
+
+        // Cukup salah satu item belum terassign (dan masih ada stok yang bisa
+        // diassign saat rescue) maka belum dianggap selesai. Untuk idempotent
+        // sederhana: anggap selesai jika SEMUA item sudah punya stock_id ATAU
+        // tidak punya stok (manual delivery).
+        return $items->every(fn (OrderItem $i) => $i->stock_id !== null || $i->fulfilled_at !== null);
+    }
+
+    /**
+     * @param  Collection<int, OrderItem>  $items
+     */
+    protected function assignStockForItems(Order $order, $items, bool $wasAlreadyPaid): bool
+    {
+        $anyAssigned = false;
+        foreach ($items as $item) {
+            if ($item->stock_id) {
+                $anyAssigned = true;
+
+                continue;
+            }
+
+            $stock = Stock::where('product_variant_id', $item->product_variant_id)
+                ->where('is_sold', false)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->first();
+
+            if ($stock) {
+                $stock->is_sold = true;
+                $stock->sold_at = now();
+                $stock->save();
+
+                $item->stock_id = $stock->id;
+                $item->fulfilled_at = now();
+                $item->save();
+
+                $anyAssigned = true;
+
+                Audit::log('stock.delivered', $order, [
+                    'stock_id' => $stock->id,
+                    'variant_id' => $item->product_variant_id,
+                    'order_item_id' => $item->id,
+                ]);
+            } else {
+                Audit::log('stock.out_of_stock', $order, [
+                    'variant_id' => $item->product_variant_id,
+                    'order_item_id' => $item->id,
+                    'note' => 'Pembayaran sukses tapi stok otomatis kosong.',
+                ]);
+            }
+        }
+
+        // Untuk single-item order yang juga punya 1 OrderItem, sinkron-kan
+        // Order.stock_id ke item.stock_id supaya kompatibel dengan kode lama
+        // yang masih membaca Order.stock_id (mis. Filament resource).
+        if ($items->count() === 1 && $items->first()->stock_id && empty($order->stock_id)) {
+            $order->stock_id = $items->first()->stock_id;
+        }
+
+        return $anyAssigned;
+    }
+
+    protected function assignStockLegacy(Order $order, bool $wasAlreadyPaid): bool
+    {
+        if (empty($order->product_variant_id)) {
+            return false;
+        }
+
+        $stock = Stock::where('product_variant_id', $order->product_variant_id)
+            ->where('is_sold', false)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->first();
+
+        if (! $stock) {
+            Audit::log('stock.out_of_stock', $order, [
+                'variant_id' => $order->product_variant_id,
+                'note' => 'Pembayaran sukses tapi stok otomatis kosong.',
+            ]);
+
+            return false;
+        }
+
+        $stock->is_sold = true;
+        $stock->sold_at = now();
+        $stock->save();
+
+        $order->stock_id = $stock->id;
+
+        Audit::log('stock.delivered', $order, [
+            'stock_id' => $stock->id,
+            'variant_id' => $order->product_variant_id,
+        ]);
+
+        return true;
+    }
+
+    protected function incrementCounters(?int $productId, ?int $variantId, int $amount, int $qty): void
+    {
+        if ($variantId) {
+            $fs = Flashsale::active()
+                ->where('product_variant_id', $variantId)
+                ->lockForUpdate()
+                ->first();
+            if ($fs && $amount === (int) $fs->flash_price) {
+                $fs->increment('sold', $qty);
+            }
+        }
+        if ($productId) {
+            Product::whereKey($productId)->increment('sold_count', $qty);
+        }
     }
 }

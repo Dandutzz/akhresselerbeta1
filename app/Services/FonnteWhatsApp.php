@@ -53,12 +53,41 @@ class FonnteWhatsApp
             return false;
         }
 
-        $stock = $order->stock; // Encrypted email/password/info accessible via cast.
+        $template = trim((string) ($site->fonnte_credentials_template ?? '')) ?: self::DEFAULT_TEMPLATE;
+
+        // Path multi-item: kirim 1 pesan per item (variant) yang berhasil di-assign stok.
+        $items = $order->items()->with(['stock', 'product', 'variant'])->get();
+        $itemsWithStock = $items->filter(fn ($i) => $i->stock !== null);
+        if ($itemsWithStock->isNotEmpty()) {
+            $sentAny = false;
+            $lastStock = null;
+            foreach ($itemsWithStock as $item) {
+                $message = strtr($template, [
+                    '{{order_code}}' => (string) $order->order_code,
+                    '{{product}}' => (string) optional($item->product)->name,
+                    '{{variant}}' => (string) optional($item->variant)->name,
+                    '{{email}}' => (string) $item->stock->email_or_phone,
+                    '{{password}}' => (string) $item->stock->password,
+                    '{{additional_info}}' => (string) ($item->stock->additional_info ?? '-'),
+                ]);
+                if ($this->send($order, $phone, $message)) {
+                    $sentAny = true;
+                    $lastStock = $item->stock;
+                }
+            }
+            if ($sentAny && $lastStock) {
+                $this->notifyAdmin($order, $lastStock);
+            }
+
+            return $sentAny;
+        }
+
+        // Fallback legacy: order single-stock pakai Order.stock_id.
+        $stock = $order->stock;
         if (! $stock) {
             return false;
         }
 
-        $template = trim((string) ($site->fonnte_credentials_template ?? '')) ?: self::DEFAULT_TEMPLATE;
         $message = strtr($template, [
             '{{order_code}}' => (string) $order->order_code,
             '{{product}}' => (string) optional($order->product)->name,

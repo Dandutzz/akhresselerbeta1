@@ -12,6 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Trust the reverse proxy (devinapps tunnel / production load balancer)
+        // sehingga Laravel tahu skema asli (https) & host asli — penting agar
+        // asset URL & redirect tidak balik ke http://localhost.
+        $middleware->trustProxies(at: '*');
+
         // Pasang security headers ke SEMUA response web & api.
         $middleware->append(SecurityHeaders::class);
 
