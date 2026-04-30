@@ -117,6 +117,7 @@ class CheckoutController extends Controller
                 'fee' => $fee,
                 'total_payment' => $total,
                 'status' => Order::STATUS_PENDING,
+                'source' => Order::SOURCE_WEB,
                 'expired_at' => now()->addMinutes(
                     (int) config('pakasir.order_expiry_minutes', 60)
                 ),
@@ -146,18 +147,11 @@ class CheckoutController extends Controller
             'product' => $variant->product?->name,
         ]);
 
-        if (! $this->pakasir->isConfigured()) {
-            return redirect()
-                ->route('invoice.show', $order->order_code)
-                ->with('warning', 'Payment gateway belum dikonfigurasi. Hubungi admin.');
-        }
-
-        $paymentUrl = $this->pakasir->buildPaymentUrl(
-            $order,
-            route('invoice.show', $order->order_code)
-        );
-
-        return redirect()->away($paymentUrl);
+        // Redirect ke invoice publik kita sendiri — QRIS akan di-render di
+        // halaman tersebut via PakasirService::createQrisTransaction(). User
+        // tidak perlu redirect ke halaman hosted Pakasir.
+        return redirect()
+            ->route('invoice.show', $order->order_code)
+            ->with('success', 'Order berhasil dibuat. Scan QRIS di bawah untuk membayar.');
     }
-
 }

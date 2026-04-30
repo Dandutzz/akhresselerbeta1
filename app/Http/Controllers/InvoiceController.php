@@ -22,8 +22,10 @@ class InvoiceController extends Controller
             ->where('order_code', $orderCode)
             ->firstOrFail();
 
-        // Fallback: jika user balik dari Pakasir dan status lokal masih pending,
-        // coba sinkron dari Pakasir secara on-demand (tanpa menunggu webhook).
+        // Fallback: jika status lokal masih pending, polling status dari
+        // Pakasir secara on-demand (tanpa menunggu webhook). Pakasir
+        // transactiondetail memakai amount original (tanpa fee). Endpoint
+        // ini akan return 404 selama transaksi belum completed — itu wajar.
         if ($order->isPending() && $this->pakasir->isConfigured()) {
             $detail = $this->pakasir->fetchTransactionDetail(
                 $order->order_code,
@@ -42,10 +44,17 @@ class InvoiceController extends Controller
             }
         }
 
+        // Fetch QR string buat di-render di view (hanya saat masih pending).
+        $qris = null;
+        if ($order->isPending() && $this->pakasir->isConfigured()) {
+            $qris = $this->pakasir->createQrisTransaction($order);
+        }
+
         return view('invoice', [
             'order' => $order,
             'credentials' => $this->decryptedCredentials($order),
             'itemCredentials' => $this->itemCredentials($order),
+            'qris' => $qris,
         ]);
     }
 

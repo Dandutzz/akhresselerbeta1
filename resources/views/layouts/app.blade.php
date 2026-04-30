@@ -4,8 +4,38 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', ($site?->store_name ?? 'Akhpremium Store') . ' — Akun Premium Legal & Murah')</title>
-    <meta name="description" content="@yield('meta_description', $site?->tagline ?? 'Toko akun premium legal dengan auto-delivery 24 jam.')">
+    @php
+        $seoTitle = $site?->seo_meta_title
+            ?: (($site?->store_name ?? 'Akhpremium Store') . ' — Akun Premium Legal & Murah');
+        $seoDescription = $site?->seo_meta_description
+            ?: ($site?->tagline ?? 'Toko akun premium legal dengan auto-delivery 24 jam.');
+        $seoKeywords = $site?->seo_meta_keywords;
+        $seoCanonical = $site?->seo_canonical_url ?: url()->current();
+        $seoRobots = $site?->seo_robots ?: 'index,follow';
+        $seoOgImage = $site?->seo_og_image_path
+            ? asset('storage/' . ltrim($site->seo_og_image_path, '/'))
+            : ($site?->logo_path ? asset('storage/' . ltrim($site->logo_path, '/')) : null);
+    @endphp
+    <title>@yield('title', $seoTitle)</title>
+    <meta name="description" content="@yield('meta_description', $seoDescription)">
+    @if ($seoKeywords)
+        <meta name="keywords" content="{{ $seoKeywords }}">
+    @endif
+    <meta name="robots" content="{{ $seoRobots }}">
+    <link rel="canonical" href="{{ $seoCanonical }}">
+
+    {{-- Open Graph / sosial media preview --}}
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="@yield('title', $seoTitle)">
+    <meta property="og:description" content="@yield('meta_description', $seoDescription)">
+    <meta property="og:url" content="{{ $seoCanonical }}">
+    @if ($seoOgImage)
+        <meta property="og:image" content="{{ $seoOgImage }}">
+        <meta name="twitter:image" content="{{ $seoOgImage }}">
+    @endif
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="@yield('title', $seoTitle)">
+    <meta name="twitter:description" content="@yield('meta_description', $seoDescription)">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

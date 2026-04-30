@@ -26,6 +26,15 @@ class OrderForm
                     ->columns(2)
                     ->schema([
                         TextInput::make('order_code')->disabled(),
+                        Select::make('source')
+                            ->label('Saluran Order')
+                            ->options([
+                                Order::SOURCE_WEB => 'Web',
+                                Order::SOURCE_TELEGRAM => 'Telegram',
+                            ])
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->helperText('Channel asal order (otomatis di-set saat order dibuat).'),
                         Select::make('status')
                             ->options([
                                 Order::STATUS_PENDING => 'Pending',
