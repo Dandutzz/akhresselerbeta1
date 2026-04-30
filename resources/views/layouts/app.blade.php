@@ -200,6 +200,8 @@
     @include('partials.mini-cart')
 @endauth
 
+@include('partials.announcement-modal')
+
 @stack('scripts')
 </body>
 </html>

@@ -11,7 +11,6 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -21,6 +20,7 @@ use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\HtmlString;
 
 class UsersTable
 {
@@ -114,7 +114,7 @@ class UsersTable
                             '<thead><tr class="border-b bg-slate-50"><th class="py-2 px-3 text-left">Kode</th><th class="py-2 px-3 text-left">Status</th><th class="py-2 px-3 text-right">Total</th><th class="py-2 px-3 text-left">Tanggal</th></tr></thead>'.
                             '<tbody>'.$rows.'</tbody></table></div>';
 
-                        return new \Illuminate\Support\HtmlString($html);
+                        return new HtmlString($html);
                     }),
 
                 Action::make('topup')
@@ -237,6 +237,7 @@ class UsersTable
                             foreach ($records as $user) {
                                 if (! $user->phone) {
                                     $skipped++;
+
                                     continue;
                                 }
                                 $msg = str_replace('{nama}', $user->name, $data['message']);
