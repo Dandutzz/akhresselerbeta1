@@ -34,7 +34,8 @@ class OrderFulfillment
         bool $allowFromTerminalStates = false,
     ): bool {
         $assignedStock = false;
-        $result = DB::transaction(function () use ($order, $context, $allowFromTerminalStates, &$assignedStock) {
+        $transitionedToPaid = false;
+        $result = DB::transaction(function () use ($order, $context, $allowFromTerminalStates, &$assignedStock, &$transitionedToPaid) {
             /** @var Order $locked */
             $locked = Order::lockForUpdate()->find($order->id);
             if (! $locked) {
@@ -66,6 +67,7 @@ class OrderFulfillment
             if (! $wasAlreadyPaid) {
                 $locked->status = Order::STATUS_PAID;
                 $locked->paid_at = now();
+                $transitionedToPaid = true;
             }
             if (! empty($context['payment_method'])) {
                 $locked->payment_method = (string) $context['payment_method'];
@@ -98,6 +100,13 @@ class OrderFulfillment
 
             return true;
         });
+
+        // Notif admin via Telegram saat transisi ke PAID — di luar transaction
+        // supaya HTTP call tidak block lock DB. Trigger sekali saja, tidak ulang
+        // pada idempotent retry (saat order sudah PAID dari sebelumnya).
+        if ($result && $transitionedToPaid) {
+            app(TelegramBotService::class)->notifyAdminOrderPaid($order->fresh());
+        }
 
         // Auto-kirim kredensial via Fonnte WA — di luar transaction supaya HTTP call
         // tidak block lock DB. Service handle exception sendiri (return false, gak throw).
