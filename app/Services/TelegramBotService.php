@@ -770,7 +770,6 @@ class TelegramBotService
             ]);
         }
 
-        $this->notifyAdminOrderCreated($order, 'Telegram Bot');
     }
 
     /* =======================================================================
@@ -1112,52 +1111,47 @@ class TelegramBotService
     }
 
     /**
-     * Push notif ke admin saat order baru dibuat (PENDING).
-     * Sumber: web checkout, web cart, atau Telegram bot. Tidak throw —
-     * gagal kirim hanya logged supaya tidak block flow checkout.
+     * Push notif ke admin saat order transisi ke PAID (sukses).
+     * Format "TRANSAKSI BARU" dipakai untuk semua source (web checkout,
+     * web cart, Telegram bot). Tidak throw — gagal kirim hanya logged
+     * supaya tidak block flow fulfillment.
      */
-    public function notifyAdminOrderCreated(Order $order, string $sourceLabel): void
+    public function notifyAdminOrderPaid(Order $order): void
     {
         try {
             $order->loadMissing(['user', 'product', 'variant', 'items.product', 'items.variant']);
 
             if ($order->items->isNotEmpty()) {
-                $lines = $order->items->map(fn ($i) => '• '.htmlspecialchars((string) ($i->product?->name ?? '-'))
+                $lines = $order->items->map(fn ($i) => htmlspecialchars((string) ($i->product?->name ?? '-'))
                     .' — '.htmlspecialchars((string) ($i->variant?->name ?? '-'))
                     .' (×'.(int) $i->qty.')')->all();
+                $layanan = implode(', ', $lines);
             } else {
-                $lines = ['• '.htmlspecialchars((string) ($order->product?->name ?? '-'))
-                    .' — '.htmlspecialchars((string) ($order->variant?->name ?? '-'))];
+                $layanan = htmlspecialchars((string) ($order->product?->name ?? '-'))
+                    .' — '.htmlspecialchars((string) ($order->variant?->name ?? '-'))
+                    .' (×1)';
             }
 
             $customer = $order->user
                 ? ($order->user->name.' ('.$order->user->email.')')
-                : ((string) $order->customer_email.($order->customer_phone ? ' / '.$order->customer_phone : ''));
-
-            $this->notifyAdmin("🆕 <b>Order baru</b> via {$sourceLabel}\n\n"
-                .'🆔 <code>'.htmlspecialchars((string) $order->order_code)."</code>\n"
-                .'👤 '.htmlspecialchars($customer)."\n"
-                .implode("\n", $lines)."\n"
-                .'💵 Rp '.number_format((int) $order->total_payment, 0, ',', '.'));
-        } catch (\Throwable $e) {
-            Log::warning('notifyAdminOrderCreated failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
-        }
-    }
-
-    /** Push notif ke admin saat order transisi ke PAID (semua source). */
-    public function notifyAdminOrderPaid(Order $order): void
-    {
-        try {
-            $order->loadMissing(['user']);
-            $customer = $order->user
-                ? ($order->user->name.' ('.$order->user->email.')')
                 : (string) $order->customer_email;
 
-            $this->notifyAdmin("💚 <b>Order PAID</b>\n\n"
-                .'🆔 <code>'.htmlspecialchars((string) $order->order_code)."</code>\n"
-                .'👤 '.htmlspecialchars($customer)."\n"
-                .'💵 Rp '.number_format((int) $order->total_payment, 0, ',', '.')."\n"
-                .'💳 '.htmlspecialchars((string) ($order->payment_method ?: 'pakasir')));
+            $orderVia = match ($order->source) {
+                Order::SOURCE_WEB => 'Website',
+                Order::SOURCE_TELEGRAM => 'Telegram',
+                default => ucfirst((string) $order->source),
+            };
+
+            $via = strtoupper((string) ($order->payment_method ?: 'QRIS'));
+
+            $this->notifyAdmin("🔔 <b>TRANSAKSI BARU!!</b> 🔔\n\n"
+                .'Invoice ID : <code>'.htmlspecialchars((string) $order->order_code)."</code>\n"
+                .'Customer : '.htmlspecialchars($customer)."\n"
+                .'Layanan : '.$layanan."\n"
+                .'Harga: Rp '.number_format((int) $order->total_payment, 0, ',', '.')."\n"
+                .'Order Via : '.htmlspecialchars($orderVia)."\n"
+                ."Status: Sukses [✅]\n"
+                .'Via: '.htmlspecialchars($via));
         } catch (\Throwable $e) {
             Log::warning('notifyAdminOrderPaid failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
         }
