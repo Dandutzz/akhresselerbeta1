@@ -38,6 +38,14 @@ return [
             'report' => false,
         ],
 
+        'backups' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/akhpremium-backups'),
+            'visibility' => 'private',
+            'throw' => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

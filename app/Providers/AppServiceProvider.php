@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Listeners\NotifyTelegramOnBackupEvent;
 use App\Models\SiteSetting;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
@@ -40,5 +42,8 @@ class AppServiceProvider extends ServiceProvider
             }
             $view->with('site', $site);
         });
+
+        // Telegram notif untuk event backup (sukses/gagal/cleanup/health)
+        Event::subscribe(NotifyTelegramOnBackupEvent::class);
     }
 }
