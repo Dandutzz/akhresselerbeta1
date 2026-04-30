@@ -718,10 +718,16 @@ class TelegramBotService
             $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=512x512&margin=10&data='
                 .rawurlencode($qris['payment_number']);
 
-            $this->sendPhoto($chatId, $qrUrl, $caption, [
+            $resp = $this->sendPhoto($chatId, $qrUrl, $caption, [
                 'parse_mode' => 'HTML',
                 'reply_markup' => json_encode(['inline_keyboard' => $rows]),
             ]);
+
+            // Simpan message_id biar bisa di-delete saat order paid (rapi).
+            $msgId = $resp['result']['message_id'] ?? null;
+            if ($msgId) {
+                $order->forceFill(['telegram_qr_message_id' => (int) $msgId])->save();
+            }
         } else {
             $text = "✅ <b>Order berhasil dibuat!</b>\n\n"
                 ."🆔 Kode: <code>{$order->order_code}</code>\n"
@@ -959,6 +965,20 @@ class TelegramBotService
         }
 
         $chatId = $order->user->telegram_chat_id;
+
+        // Hapus message QR sebelumnya supaya chat rapi setelah paid.
+        if ($order->telegram_qr_message_id) {
+            try {
+                $this->call('deleteMessage', [
+                    'chat_id' => $chatId,
+                    'message_id' => (int) $order->telegram_qr_message_id,
+                ]);
+            } catch (\Throwable $e) {
+                // Telegram batas delete 48 jam — kalau gagal, abaikan saja.
+            }
+            $order->forceFill(['telegram_qr_message_id' => null])->save();
+        }
+
         $items = $order->items()->with(['variant.product', 'stock'])->get();
 
         if ($items->isEmpty()) {
