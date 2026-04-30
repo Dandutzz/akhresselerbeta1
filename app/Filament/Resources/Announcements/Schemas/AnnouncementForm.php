@@ -40,6 +40,11 @@ class AnnouncementForm
                     ->directory('announcements')
                     ->disk('public')
                     ->columnSpanFull(),
+                TextInput::make('icon')
+                    ->label('Icon emoji (opsional)')
+                    ->maxLength(8)
+                    ->placeholder('📣  🎉  🔥  ⚠️  🛍️')
+                    ->helperText('Boleh emoji apa saja. Hanya dipakai jika gambar di atas dikosongkan.'),
                 DateTimePicker::make('published_at')
                     ->label('Mulai tampil pada (kosongkan = langsung)')
                     ->seconds(false),

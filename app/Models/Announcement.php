@@ -14,8 +14,10 @@ class Announcement extends Model
         'cta_label',
         'cta_url',
         'image',
+        'icon',
         'is_active',
         'published_at',
+        'sort_order',
     ];
 
     protected function casts(): array
@@ -23,6 +25,7 @@ class Announcement extends Model
         return [
             'is_active' => 'boolean',
             'published_at' => 'datetime',
+            'sort_order' => 'integer',
         ];
     }
 

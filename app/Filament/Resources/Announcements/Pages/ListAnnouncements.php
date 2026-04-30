@@ -10,6 +10,8 @@ class ListAnnouncements extends ListRecords
 {
     protected static string $resource = AnnouncementResource::class;
 
+    public bool $isTableReordering = true;
+
     protected function getHeaderActions(): array
     {
         return [

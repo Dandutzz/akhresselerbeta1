@@ -1,5 +1,6 @@
 @php
     $announcements = \App\Models\Announcement::published()
+        ->orderBy('sort_order', 'asc')
         ->orderByDesc('published_at')
         ->orderByDesc('id')
         ->limit(3)
@@ -28,6 +29,10 @@
                              data-index="{{ $i }}">
                         @if ($url = $ann->imageUrl())
                             <img src="{{ $url }}" alt="" class="mx-auto mb-4 max-h-32 rounded-xl object-contain">
+                        @elseif (! empty($ann->icon))
+                            <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 ring-8 ring-amber-50 text-4xl leading-none">
+                                {{ $ann->icon }}
+                            </div>
                         @else
                             <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 ring-8 ring-amber-50">
                                 <svg viewBox="0 0 24 24" class="h-9 w-9 text-amber-500" fill="currentColor">

@@ -37,7 +37,8 @@ class AnnouncementsTable
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->defaultSort('id', 'desc')
+            ->defaultSort('sort_order', 'asc')
+            ->reorderable('sort_order')
             ->filters([
                 //
             ])
