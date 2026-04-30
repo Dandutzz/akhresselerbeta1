@@ -104,15 +104,30 @@
                             <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Bayar dengan QRIS</div>
                             <span class="px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-bold">PAKASIR</span>
                         </div>
-                        <div class="text-2xl font-extrabold text-slate-900 mb-3">
-                            Rp {{ number_format($order->total_payment, 0, ',', '.') }}
+                        @php
+                            // Pakasir tambah biaya admin di atas total_payment kita.
+                            // Tampilkan amount yang Pakasir kembalikan (sudah termasuk
+                            // fee) supaya match dengan yang akan ditagih e-wallet
+                            // user saat scan QR.
+                            $qrAmount = (int) ($qris['total_payment'] ?? $order->total_payment);
+                            $qrFee = (int) ($qris['fee'] ?? 0);
+                        @endphp
+                        <div class="text-2xl font-extrabold text-slate-900 mb-1">
+                            Rp {{ number_format($qrAmount, 0, ',', '.') }}
                         </div>
+                        @if ($qrFee > 0)
+                            <div class="text-[11px] text-slate-500 mb-3">
+                                Termasuk biaya admin Rp {{ number_format($qrFee, 0, ',', '.') }}
+                            </div>
+                        @else
+                            <div class="mb-3"></div>
+                        @endif
                         <div class="inline-block p-3 bg-white border border-slate-200 rounded-xl shadow-card">
                             {{-- Render QR sebagai PNG via api.qrserver.com (sama dengan
                                  yang dipakai Telegram bot). Tidak butuh JS / CDN library. --}}
                             <img
                                 src="https://api.qrserver.com/v1/create-qr-code/?size=480x480&margin=10&ecc=M&data={{ urlencode($qris['payment_number']) }}"
-                                alt="QRIS — Rp {{ number_format($order->total_payment, 0, ',', '.') }}"
+                                alt="QRIS — Rp {{ number_format($qrAmount, 0, ',', '.') }}"
                                 class="block mx-auto"
                                 style="width: 240px; height: 240px;"
                                 loading="eager"

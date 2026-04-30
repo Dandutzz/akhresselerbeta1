@@ -111,17 +111,35 @@ class PakasirService
             return null;
         }
 
+        // Pakasir menambahkan fee di atas amount yang kita kirim. Simpan
+        // fee + total Pakasir di Order supaya kita bisa polling status pakai
+        // amount yang benar (Pakasir menolak query dengan amount tanpa fee).
+        $pakasirFee = (int) ($payment['fee'] ?? 0);
+        $pakasirTotal = (int) ($payment['total_payment'] ?? ($order->total_payment + $pakasirFee));
+
         $order->forceFill([
             'payment_qr_string' => $payment['payment_number'],
             'payment_method_requested' => 'qris',
+            'fee' => $pakasirFee,
         ])->save();
 
         return [
             'payment_number' => (string) $payment['payment_number'],
-            'total_payment' => (int) ($payment['total_payment'] ?? $order->total_payment),
-            'fee' => (int) ($payment['fee'] ?? 0),
+            'total_payment' => $pakasirTotal,
+            'fee' => $pakasirFee,
             'expired_at' => $payment['expired_at'] ?? null,
         ];
+    }
+
+    /**
+     * Hitung amount Pakasir-side: total_payment kita + fee yang Pakasir
+     * tambahkan saat createQris. Dipakai saat polling fetchTransactionDetail
+     * — Pakasir simpan transaksinya dengan total_payment + fee, bukan amount
+     * mentah yang kita kirim.
+     */
+    public function pakasirAmount(Order $order): int
+    {
+        return (int) $order->total_payment + (int) ($order->fee ?? 0);
     }
 
     /**
@@ -176,7 +194,8 @@ class PakasirService
     /**
      * Validasi payload webhook terhadap Order lokal + verifikasi via API.
      * Kembalikan true hanya bila:
-     *  - amount di payload == Order.total_payment
+     *  - amount di payload == Order.total_payment (Pakasir mengirim amount
+     *    yang asli kita kirim, bukan total + fee)
      *  - status di API Pakasir == 'completed'
      */
     public function verifyWebhook(Order $order, array $payload): bool
