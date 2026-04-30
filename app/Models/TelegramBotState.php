@@ -13,8 +13,11 @@ class TelegramBotState extends Model
     ];
 
     public const STATE_IDLE = 'idle';
+
     public const STATE_BROWSING = 'browsing';
+
     public const STATE_CART = 'cart';
+
     public const STATE_AWAITING_PAYMENT = 'awaiting_payment';
 
     public static function for(string $chatId): self
@@ -48,6 +51,33 @@ class TelegramBotState extends Model
     {
         $payload = $this->payload ?? [];
         $payload['cart'] = $cart;
+        $this->payload = $payload;
+        $this->save();
+
+        return $this;
+    }
+
+    public function getPendingQty(int $variantId): int
+    {
+        return (int) (($this->payload['pending_qty'][$variantId] ?? 1));
+    }
+
+    public function setPendingQty(int $variantId, int $qty): self
+    {
+        $payload = $this->payload ?? [];
+        $payload['pending_qty'][$variantId] = max(1, $qty);
+        $this->payload = $payload;
+        $this->save();
+
+        return $this;
+    }
+
+    public function clearPendingQty(int $variantId): self
+    {
+        $payload = $this->payload ?? [];
+        if (isset($payload['pending_qty'][$variantId])) {
+            unset($payload['pending_qty'][$variantId]);
+        }
         $this->payload = $payload;
         $this->save();
 

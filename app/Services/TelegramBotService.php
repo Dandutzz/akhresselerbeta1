@@ -187,7 +187,7 @@ class TelegramBotService
         }
 
         // Default: balas dengan main menu
-        $this->sendMessage($chatId, "Hai! Aku gak ngerti perintah <i>" . htmlspecialchars($text) . "</i>. Pilih dari menu di bawah ya.", $this->mainMenuKeyboard());
+        $this->sendMessage($chatId, 'Hai! Aku gak ngerti perintah <i>'.htmlspecialchars($text).'</i>. Pilih dari menu di bawah ya.', $this->mainMenuKeyboard());
     }
 
     /* =======================================================================
@@ -213,7 +213,7 @@ class TelegramBotService
             // Pastikan token belum dipakai di akun Telegram lain
             $other = User::where('telegram_chat_id', $chatId)->first();
             if ($other && $other->id !== $linkToken->user_id) {
-                $this->sendMessage($chatId, "⚠ Akun Telegram ini sudah ter-link ke user lain. Hubungi support kalau butuh bantuan.");
+                $this->sendMessage($chatId, '⚠ Akun Telegram ini sudah ter-link ke user lain. Hubungi support kalau butuh bantuan.');
 
                 return;
             }
@@ -227,7 +227,7 @@ class TelegramBotService
 
             $this->sendMessage(
                 $chatId,
-                "✅ <b>Akun berhasil di-link!</b>\n\nHalo, <b>" . htmlspecialchars($user->name) . "</b> 👋\n\nKamu sekarang bisa order langsung lewat bot ini.",
+                "✅ <b>Akun berhasil di-link!</b>\n\nHalo, <b>".htmlspecialchars($user->name)."</b> 👋\n\nKamu sekarang bisa order langsung lewat bot ini.",
                 $this->mainMenuKeyboard()
             );
 
@@ -238,17 +238,17 @@ class TelegramBotService
         if ($existing) {
             $this->sendMessage(
                 $chatId,
-                "👋 Selamat datang kembali, <b>" . htmlspecialchars($existing->name) . "</b>!\n\nPilih menu di bawah untuk mulai belanja:",
+                '👋 Selamat datang kembali, <b>'.htmlspecialchars($existing->name)."</b>!\n\nPilih menu di bawah untuk mulai belanja:",
                 $this->mainMenuKeyboard()
             );
         } else {
             $welcomeText = "🎉 <b>Selamat datang di Akhpremium Store!</b>\n\n"
-                . "Toko digital akun premium dengan harga terjangkau & garansi.\n\n"
-                . "🔗 <b>Mau order?</b> Hubungkan akun web kamu dulu:\n"
-                . "1. Buka website → login → menu <b>Akun → Hubungkan Telegram</b>\n"
-                . "2. Klik <b>Generate Token</b>\n"
-                . "3. Kirim <code>/start TOKEN</code> ke bot ini\n\n"
-                . "Atau langsung browse produk dulu di menu di bawah 👇";
+                ."Toko digital akun premium dengan harga terjangkau & garansi.\n\n"
+                ."🔗 <b>Mau order?</b> Hubungkan akun web kamu dulu:\n"
+                ."1. Buka website → login → menu <b>Akun → Hubungkan Telegram</b>\n"
+                ."2. Klik <b>Generate Token</b>\n"
+                ."3. Kirim <code>/start TOKEN</code> ke bot ini\n\n"
+                .'Atau langsung browse produk dulu di menu di bawah 👇';
 
             $this->sendMessage($chatId, $welcomeText, $this->mainMenuKeyboard());
         }
@@ -305,27 +305,29 @@ class TelegramBotService
             return;
         }
 
-        $text = "📦 <b>List Produk</b> (hal {$page}/{$totalPages})\n\n";
+        $text = "<b>LIST PRODUCT</b>\n\n";
         $rows = [];
         $i = ($page - 1) * $perPage + 1;
 
         foreach ($products as $product) {
-            $stockBadge = $product->available_stocks > 0
-                ? "✅ {$product->available_stocks} stok"
-                : '❌ habis';
-            $text .= "<b>{$i}.</b> " . htmlspecialchars($product->name) . " — {$stockBadge}\n";
-            $rows[] = [['text' => "{$i}. " . Str::limit($product->name, 25), 'callback_data' => "product:{$product->id}"]];
+            $count = (int) $product->available_stocks;
+            $badge = $count > 0 ? '✅' : '❌';
+            $text .= "[<b>{$i}</b>]. ".htmlspecialchars($product->name)
+                ." ( {$count} ) {$badge}\n";
+            $rows[] = [['text' => "{$i}. ".Str::limit($product->name, 25), 'callback_data' => "product:{$product->id}"]];
             $i++;
         }
+
+        $text .= "\nHal {$page}/{$totalPages}";
 
         // Pagination row
         $pagination = [];
         if ($page > 1) {
-            $pagination[] = ['text' => '« Prev', 'callback_data' => 'plist:' . ($page - 1)];
+            $pagination[] = ['text' => '« Prev', 'callback_data' => 'plist:'.($page - 1)];
         }
         $pagination[] = ['text' => "{$page}/{$totalPages}", 'callback_data' => 'noop'];
         if ($page < $totalPages) {
-            $pagination[] = ['text' => 'Next »', 'callback_data' => 'plist:' . ($page + 1)];
+            $pagination[] = ['text' => 'Next »', 'callback_data' => 'plist:'.($page + 1)];
         }
         if (count($pagination) > 1) {
             $rows[] = $pagination;
@@ -364,37 +366,47 @@ class TelegramBotService
             return;
         }
 
-        $caption = "<b>" . htmlspecialchars($product->name) . "</b>\n\n";
-        if ($product->description) {
-            $caption .= htmlspecialchars(Str::limit(strip_tags($product->description), 400)) . "\n\n";
-        }
-        if ($product->terms_html) {
-            $caption .= "<b>S&K:</b>\n" . htmlspecialchars(Str::limit(strip_tags($product->terms_html), 300)) . "\n\n";
-        }
-        $caption .= "<b>Pilih varian:</b>";
+        $totalSold = (int) ($product->sold_count ?? 0) + (int) ($product->fake_sold_count ?? 0);
+        $desk = trim((string) ($product->short_description ?? strip_tags((string) $product->description)));
+        $desk = $desk !== '' ? Str::limit($desk, 200) : '-';
+
+        $caption = "<b>tambahkan jumlah pembelian:</b>\n";
+        $caption .= "╭───────────────\n";
+        $caption .= '┊・Produk : '.htmlspecialchars($product->name)."\n";
+        $caption .= "┊・Stok Terjual : {$totalSold}\n";
+        $caption .= '┊・Desk : '.htmlspecialchars($desk)."\n";
+        $caption .= "╰───────────────\n";
+        $caption .= "╭───────────────\n";
+        $caption .= "┊ Variasi, Harga - (Stok):\n";
 
         $rows = [];
         foreach ($product->variants as $v) {
-            $stock = $v->available_count;
-            $price = 'Rp ' . number_format($v->effectivePrice(), 0, ',', '.');
-            $btnText = htmlspecialchars($v->name) . " — {$price} ({$stock} stok)";
+            $stock = (int) $v->available_count;
+            $priceStr = 'Rp. '.number_format($v->effectivePrice(), 0, ',', '.');
+            $caption .= '┊・'.htmlspecialchars($v->name).": {$priceStr} - ({$stock})\n";
+            $btnText = Str::limit($v->name, 28).' — Rp'.number_format($v->effectivePrice(), 0, ',', '.');
             if ($stock > 0) {
                 $rows[] = [['text' => $btnText, 'callback_data' => "variant:{$v->id}"]];
             } else {
-                $rows[] = [['text' => "❌ " . $btnText . " HABIS", 'callback_data' => 'noop']];
+                $rows[] = [['text' => "❌ {$btnText} HABIS", 'callback_data' => 'noop']];
             }
         }
+        $caption .= "╰───────────────\n\n";
+        $caption .= '<i>Current Date: '.now()->format('h:i:s A').'</i>';
+
         $rows[] = [
-            ['text' => '« Back ke Produk', 'callback_data' => 'plist:1'],
+            ['text' => '« List Produk', 'callback_data' => 'plist:1'],
             ['text' => '🛒 Keranjang', 'callback_data' => 'cart'],
         ];
 
-        $extra = ['reply_markup' => json_encode(['inline_keyboard' => $rows])];
+        $extra = [
+            'parse_mode' => 'HTML',
+            'reply_markup' => json_encode(['inline_keyboard' => $rows]),
+        ];
 
-        // Coba kirim photo kalau ada, fallback ke text. Kolom di DB: 'image'.
         $img = $product->image;
-        if ($img && file_exists(public_path('storage/' . $img))) {
-            $url = url('storage/' . $img);
+        if ($img && file_exists(public_path('storage/'.$img))) {
+            $url = url('storage/'.$img);
             $this->sendPhoto($chatId, $url, $caption, $extra);
         } else {
             $this->sendMessage($chatId, $caption, $extra);
@@ -402,10 +414,87 @@ class TelegramBotService
     }
 
     /* =======================================================================
+     * Variant detail dengan qty selector
+     * ======================================================================= */
+
+    public function showVariantDetail(string $chatId, int $variantId, ?int $messageId = null): void
+    {
+        $variant = ProductVariant::with('product')
+            ->withCount(['stocks as available_count' => fn ($q) => $q->where('is_sold', false)])
+            ->find($variantId);
+
+        if (! $variant) {
+            $this->sendMessage($chatId, '⚠ Varian tidak ditemukan.');
+
+            return;
+        }
+
+        $stock = (int) $variant->available_count;
+        if ($stock < 1) {
+            $this->sendMessage($chatId, '❌ Stok varian ini habis.');
+
+            return;
+        }
+
+        $state = TelegramBotState::for($chatId);
+        $qty = max(1, min($state->getPendingQty($variantId), $stock));
+        $state->setPendingQty($variantId, $qty);
+
+        $price = (int) $variant->effectivePrice();
+        $totalPrice = $price * $qty;
+        $product = $variant->product;
+        $desk = trim((string) ($product->short_description ?? strip_tags((string) $product->description)));
+        $desk = $desk !== '' ? Str::limit($desk, 200) : '-';
+        $kode = (string) ($variant->sku ?? $variant->code ?? ('VAR-'.$variant->id));
+
+        $text = "<b>tambahkan jumlah pembelian:</b>\n";
+        $text .= "╭───────────────\n";
+        $text .= '┊・Produk : '.htmlspecialchars($product->name)."\n";
+        $text .= '┊・Variasi : '.htmlspecialchars($variant->name)."\n";
+        $text .= '┊・Kode : '.htmlspecialchars($kode)."\n";
+        $text .= "┊・Sisa Produk : {$stock}\n";
+        $text .= '┊・Desk : '.htmlspecialchars($desk)."\n";
+        $text .= "╰───────────────\n";
+        $text .= "╭───────────────\n";
+        $text .= "┊・Jumlah : {$qty}\n";
+        $text .= '┊・Harga : Rp. '.number_format($price, 0, ',', '.')."\n";
+        $text .= '┊・Total Harga : Rp. '.number_format($totalPrice, 0, ',', '.')."\n";
+        $text .= '╰───────────────';
+
+        $rows = [
+            [
+                ['text' => '➖', 'callback_data' => "vqty_dec:{$variantId}"],
+                ['text' => "{$qty}", 'callback_data' => 'noop'],
+                ['text' => '➕', 'callback_data' => "vqty_inc:{$variantId}"],
+            ],
+            [['text' => '🛒 Tambah ke Keranjang', 'callback_data' => "vadd:{$variantId}"]],
+            [
+                ['text' => '« Varian', 'callback_data' => "product:{$product->id}"],
+                ['text' => '🛒 Keranjang', 'callback_data' => 'cart'],
+            ],
+        ];
+
+        $extra = [
+            'parse_mode' => 'HTML',
+            'reply_markup' => json_encode(['inline_keyboard' => $rows]),
+        ];
+
+        if ($messageId) {
+            $this->call('editMessageText', array_merge([
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+                'text' => $text,
+            ], $extra));
+        } else {
+            $this->sendMessage($chatId, $text, $extra);
+        }
+    }
+
+    /* =======================================================================
      * Add to bot cart
      * ======================================================================= */
 
-    public function addVariantToCart(string $chatId, int $variantId): void
+    public function addVariantToCart(string $chatId, int $variantId, int $qty = 1): void
     {
         $variant = ProductVariant::with('product')->find($variantId);
         if (! $variant) {
@@ -414,6 +503,7 @@ class TelegramBotService
             return;
         }
 
+        $qty = max(1, $qty);
         $availableStock = $variant->stocks()->where('is_sold', false)->count();
         if ($availableStock < 1) {
             $this->sendMessage($chatId, '❌ Stok varian ini habis.');
@@ -433,26 +523,33 @@ class TelegramBotService
         }
 
         if ($existingIdx !== null) {
-            if ($cart[$existingIdx]['qty'] + 1 > $availableStock) {
+            $newQty = $cart[$existingIdx]['qty'] + $qty;
+            if ($newQty > $availableStock) {
                 $this->sendMessage($chatId, "⚠ Stok tidak cukup. Stok tersedia: {$availableStock}, sudah di-cart: {$cart[$existingIdx]['qty']}.");
 
                 return;
             }
-            $cart[$existingIdx]['qty']++;
+            $cart[$existingIdx]['qty'] = $newQty;
         } else {
+            if ($qty > $availableStock) {
+                $this->sendMessage($chatId, "⚠ Stok tidak cukup. Stok tersedia: {$availableStock}.");
+
+                return;
+            }
             $cart[] = [
                 'variant_id' => $variantId,
                 'product_id' => $variant->product_id,
                 'product_name' => $variant->product->name,
                 'variant_name' => $variant->name,
                 'price' => $variant->effectivePrice(),
-                'qty' => 1,
+                'qty' => $qty,
             ];
         }
 
         $state->setCart($cart);
+        $state->clearPendingQty($variantId);
 
-        $this->showCart($chatId, "✅ Ditambahkan: <b>" . htmlspecialchars($variant->product->name) . " — " . htmlspecialchars($variant->name) . "</b>\n\n");
+        $this->showCart($chatId, "✅ Ditambahkan {$qty}× <b>".htmlspecialchars($variant->product->name).' — '.htmlspecialchars($variant->name)."</b>\n\n");
     }
 
     public function showCart(string $chatId, string $prefix = ''): void
@@ -461,26 +558,26 @@ class TelegramBotService
         $cart = $state->getCart();
 
         if (empty($cart)) {
-            $this->sendMessage($chatId, $prefix . "🛒 <b>Keranjang kosong</b>\n\nKlik 📦 List Produk untuk mulai belanja.", $this->mainMenuKeyboard());
+            $this->sendMessage($chatId, $prefix."🛒 <b>Keranjang kosong</b>\n\nKlik 📦 List Produk untuk mulai belanja.", $this->mainMenuKeyboard());
 
             return;
         }
 
-        $text = $prefix . "🛒 <b>Keranjang Bot</b>\n\n";
+        $text = $prefix."🛒 <b>Keranjang Bot</b>\n\n";
         $total = 0;
         $rows = [];
         foreach ($cart as $idx => $item) {
             $line = $item['price'] * $item['qty'];
             $total += $line;
-            $text .= "<b>" . ($idx + 1) . ".</b> " . htmlspecialchars($item['product_name']) . " — " . htmlspecialchars($item['variant_name']) . "\n";
-            $text .= "   {$item['qty']} × Rp " . number_format($item['price'], 0, ',', '.') . " = Rp " . number_format($line, 0, ',', '.') . "\n\n";
+            $text .= '<b>'.($idx + 1).'.</b> '.htmlspecialchars($item['product_name']).' — '.htmlspecialchars($item['variant_name'])."\n";
+            $text .= "   {$item['qty']} × Rp ".number_format($item['price'], 0, ',', '.').' = Rp '.number_format($line, 0, ',', '.')."\n\n";
             $rows[] = [
-                ['text' => "➖ {$item['variant_name']}", 'callback_data' => 'cart_dec:' . $idx],
-                ['text' => "❌ Hapus", 'callback_data' => 'cart_rm:' . $idx],
-                ['text' => "➕", 'callback_data' => 'cart_inc:' . $idx],
+                ['text' => "➖ {$item['variant_name']}", 'callback_data' => 'cart_dec:'.$idx],
+                ['text' => '❌ Hapus', 'callback_data' => 'cart_rm:'.$idx],
+                ['text' => '➕', 'callback_data' => 'cart_inc:'.$idx],
             ];
         }
-        $text .= "<b>Total: Rp " . number_format($total, 0, ',', '.') . "</b>";
+        $text .= '<b>Total: Rp '.number_format($total, 0, ',', '.').'</b>';
 
         $rows[] = [['text' => '🧹 Kosongkan', 'callback_data' => 'cart_clear']];
         $rows[] = [['text' => '✅ Bayar Sekarang', 'callback_data' => 'checkout']];
@@ -509,7 +606,7 @@ class TelegramBotService
         }
 
         if ($user->is_banned) {
-            $this->sendMessage($chatId, "⚠ Akun kamu di-banned. Hubungi support.");
+            $this->sendMessage($chatId, '⚠ Akun kamu di-banned. Hubungi support.');
 
             return;
         }
@@ -531,7 +628,7 @@ class TelegramBotService
                 foreach ($cart as $item) {
                     $variant = ProductVariant::lockForUpdate()->find($item['variant_id']);
                     if (! $variant) {
-                        throw new \RuntimeException("Varian tidak ada lagi.");
+                        throw new \RuntimeException('Varian tidak ada lagi.');
                     }
                     $availStock = $variant->stocks()->where('is_sold', false)->count();
                     if ($availStock < $item['qty']) {
@@ -577,14 +674,14 @@ class TelegramBotService
                 return $order;
             });
         } catch (\Throwable $e) {
-            $this->sendMessage($chatId, "❌ Gagal checkout: " . $e->getMessage());
+            $this->sendMessage($chatId, '❌ Gagal checkout: '.$e->getMessage());
 
             return;
         }
 
         $state->reset();
 
-        $invoiceUrl = url('/invoice/' . $order->order_code);
+        $invoiceUrl = url('/invoice/'.$order->order_code);
 
         // Coba ambil QRIS string dari Pakasir lalu kirim sebagai gambar QR ke
         // chat. Kalau gagal (Pakasir belum dikonfigurasi / API error), fallback
@@ -609,17 +706,17 @@ class TelegramBotService
 
         if (! empty($qris['payment_number'])) {
             $caption = "✅ <b>Scan QRIS untuk bayar</b>\n\n"
-                . "🆔 Kode: <code>{$order->order_code}</code>\n"
-                . "💵 Total: <b>Rp " . number_format($order->total_payment, 0, ',', '.') . "</b>\n\n"
-                . "Scan QR di atas pakai e-wallet / m-banking favorit kamu (GoPay, OVO, Dana, BCA, dll). "
-                . "Setelah pembayaran berhasil, akun premium akan otomatis dikirim ke chat ini ✨";
+                ."🆔 Kode: <code>{$order->order_code}</code>\n"
+                .'💵 Total: <b>Rp '.number_format($order->total_payment, 0, ',', '.')."</b>\n\n"
+                .'Scan QR di atas pakai e-wallet / m-banking favorit kamu (GoPay, OVO, Dana, BCA, dll). '
+                .'Setelah pembayaran berhasil, akun premium akan otomatis dikirim ke chat ini ✨';
 
             // Render QR via public QR-image service (api.qrserver.com) supaya
             // bisa langsung dikirim sebagai foto Telegram tanpa dep server-side.
             // QRIS payload (EMVCo) bukan data sensitif — sama dengan QR yang
             // ditampilkan di halaman Pakasir.
             $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=512x512&margin=10&data='
-                . rawurlencode($qris['payment_number']);
+                .rawurlencode($qris['payment_number']);
 
             $this->sendPhoto($chatId, $qrUrl, $caption, [
                 'parse_mode' => 'HTML',
@@ -627,10 +724,10 @@ class TelegramBotService
             ]);
         } else {
             $text = "✅ <b>Order berhasil dibuat!</b>\n\n"
-                . "🆔 Kode: <code>{$order->order_code}</code>\n"
-                . "💵 Total: <b>Rp " . number_format($order->amount, 0, ',', '.') . "</b>\n\n"
-                . "🔗 <b>Buka link untuk bayar:</b>\n{$invoiceUrl}\n\n"
-                . "Setelah pembayaran berhasil, akun premium akan otomatis dikirim ke chat ini ✨";
+                ."🆔 Kode: <code>{$order->order_code}</code>\n"
+                .'💵 Total: <b>Rp '.number_format($order->amount, 0, ',', '.')."</b>\n\n"
+                ."🔗 <b>Buka link untuk bayar:</b>\n{$invoiceUrl}\n\n"
+                .'Setelah pembayaran berhasil, akun premium akan otomatis dikirim ke chat ini ✨';
 
             $this->sendMessage($chatId, $text, [
                 'reply_markup' => json_encode(['inline_keyboard' => $rows]),
@@ -639,10 +736,10 @@ class TelegramBotService
 
         // Notif admin
         $this->notifyAdmin("🆕 <b>Order baru via Telegram Bot</b>\n\n"
-            . "👤 " . htmlspecialchars($user->name) . " (" . htmlspecialchars($user->email) . ")\n"
-            . "🆔 <code>{$order->order_code}</code>\n"
-            . "💵 Rp " . number_format($order->amount, 0, ',', '.') . "\n"
-            . "📦 " . count($cart) . " varian, total " . array_sum(array_column($cart, 'qty')) . " akun");
+            .'👤 '.htmlspecialchars($user->name).' ('.htmlspecialchars($user->email).")\n"
+            ."🆔 <code>{$order->order_code}</code>\n"
+            .'💵 Rp '.number_format($order->amount, 0, ',', '.')."\n"
+            .'📦 '.count($cart).' varian, total '.array_sum(array_column($cart, 'qty')).' akun');
     }
 
     /* =======================================================================
@@ -653,14 +750,14 @@ class TelegramBotService
     {
         $user = User::where('telegram_chat_id', $chatId)->first();
         if (! $user) {
-            $this->sendMessage($chatId, "🔗 Akun belum di-link. Kirim /start TOKEN dari /akun/telegram.");
+            $this->sendMessage($chatId, '🔗 Akun belum di-link. Kirim /start TOKEN dari /akun/telegram.');
 
             return;
         }
 
         $orders = $user->orders()->orderByDesc('id')->limit(5)->get();
         if ($orders->isEmpty()) {
-            $this->sendMessage($chatId, "📜 Belum ada order.");
+            $this->sendMessage($chatId, '📜 Belum ada order.');
 
             return;
         }
@@ -674,9 +771,9 @@ class TelegramBotService
                 'expired' => '⏰',
                 default => '🔘',
             };
-            $text .= "{$statusEmoji} <code>{$o->order_code}</code> — Rp " . number_format($o->amount, 0, ',', '.') . "\n";
-            $text .= "   {$o->status} · " . $o->created_at->diffForHumans() . "\n";
-            $text .= "   🔗 " . url('/invoice/' . $o->order_code) . "\n\n";
+            $text .= "{$statusEmoji} <code>{$o->order_code}</code> — Rp ".number_format($o->amount, 0, ',', '.')."\n";
+            $text .= "   {$o->status} · ".$o->created_at->diffForHumans()."\n";
+            $text .= '   🔗 '.url('/invoice/'.$o->order_code)."\n\n";
         }
 
         $this->sendMessage($chatId, $text);
@@ -686,14 +783,14 @@ class TelegramBotService
     {
         $user = User::where('telegram_chat_id', $chatId)->first();
         if (! $user) {
-            $this->sendMessage($chatId, "🔗 Akun belum di-link.");
+            $this->sendMessage($chatId, '🔗 Akun belum di-link.');
 
             return;
         }
 
         $text = "💰 <b>Saldo Dompet</b>\n\n"
-            . "Saldo aktif: <b>Rp " . number_format($user->balance, 0, ',', '.') . "</b>\n\n"
-            . "Hubungi admin untuk top-up saldo.";
+            .'Saldo aktif: <b>Rp '.number_format($user->balance, 0, ',', '.')."</b>\n\n"
+            .'Hubungi admin untuk top-up saldo.';
         $this->sendMessage($chatId, $text);
     }
 
@@ -701,8 +798,8 @@ class TelegramBotService
     {
         $waNumber = config('app.support_wa_number', '6281234567890');
         $text = "🆘 <b>Support</b>\n\nButuh bantuan? Hubungi admin:\n\n"
-            . "📱 WhatsApp: +{$waNumber}\n"
-            . "💬 Telegram: @" . config('services.telegram.bot_username');
+            ."📱 WhatsApp: +{$waNumber}\n"
+            .'💬 Telegram: @'.config('services.telegram.bot_username');
 
         $rows = [[['text' => '💬 Chat WA', 'url' => "https://wa.me/{$waNumber}"]]];
 
@@ -714,15 +811,15 @@ class TelegramBotService
     public function showHowToOrder(string $chatId): void
     {
         $text = "❓ <b>Cara Order via Bot</b>\n\n"
-            . "1. Klik <b>📦 List Produk</b>\n"
-            . "2. Pilih produk yang kamu mau\n"
-            . "3. Pilih varian (paket) → otomatis masuk keranjang\n"
-            . "4. Klik <b>🛒 Keranjang</b> → atur qty\n"
-            . "5. Klik <b>✅ Bayar Sekarang</b>\n"
-            . "6. Bot kasih link invoice — buka & bayar\n"
-            . "7. Setelah pembayaran sukses, akun otomatis dikirim ke chat ini\n\n"
-            . "<b>📌 Wajib link akun web dulu:</b>\n"
-            . "Login di website → /akun/telegram → Generate Token → kirim ke bot dengan format: <code>/start TOKEN</code>";
+            ."1. Klik <b>📦 List Produk</b>\n"
+            ."2. Pilih produk yang kamu mau\n"
+            ."3. Pilih varian (paket) → otomatis masuk keranjang\n"
+            ."4. Klik <b>🛒 Keranjang</b> → atur qty\n"
+            ."5. Klik <b>✅ Bayar Sekarang</b>\n"
+            ."6. Bot kasih link invoice — buka & bayar\n"
+            ."7. Setelah pembayaran sukses, akun otomatis dikirim ke chat ini\n\n"
+            ."<b>📌 Wajib link akun web dulu:</b>\n"
+            .'Login di website → /akun/telegram → Generate Token → kirim ke bot dengan format: <code>/start TOKEN</code>';
         $this->sendMessage($chatId, $text);
     }
 
@@ -782,7 +879,27 @@ class TelegramBotService
             return;
         }
         if (str_starts_with($data, 'variant:')) {
-            $this->addVariantToCart($chatId, (int) substr($data, 8));
+            $this->showVariantDetail($chatId, (int) substr($data, 8));
+
+            return;
+        }
+        if (str_starts_with($data, 'vqty_inc:') || str_starts_with($data, 'vqty_dec:')) {
+            [$action, $vidStr] = explode(':', $data, 2);
+            $variantId = (int) $vidStr;
+            $state = TelegramBotState::for($chatId);
+            $current = $state->getPendingQty($variantId);
+            $delta = $action === 'vqty_inc' ? 1 : -1;
+            $next = max(1, $current + $delta);
+            $state->setPendingQty($variantId, $next);
+            $this->showVariantDetail($chatId, $variantId, $messageId);
+
+            return;
+        }
+        if (str_starts_with($data, 'vadd:')) {
+            $variantId = (int) substr($data, 5);
+            $state = TelegramBotState::for($chatId);
+            $qty = $state->getPendingQty($variantId);
+            $this->addVariantToCart($chatId, $variantId, $qty);
 
             return;
         }
@@ -848,9 +965,37 @@ class TelegramBotService
             return;
         }
 
-        $text = "🎉 <b>Pembayaran berhasil!</b>\n\n";
-        $text .= "🆔 Order: <code>{$order->order_code}</code>\n";
-        $text .= "💵 Total: <b>Rp " . number_format($order->amount, 0, ',', '.') . "</b>\n\n";
+        $first = $items->first();
+        $firstProductName = $first->variant?->product?->name ?? $first->product?->name ?? 'Produk';
+        $firstVariantName = $first->variant?->name ?? '';
+        $totalQty = (int) $items->sum('qty');
+        $accountsAssigned = $items->filter(fn ($i) => $i->stock)->sum('qty');
+        $payId = (string) ($order->pakasir_payment_number ?? $order->payment_qr_string ?? 'undefined');
+        if (strlen($payId) > 24) {
+            $payId = substr($payId, 0, 8).'…'.substr($payId, -8);
+        }
+        $price = (int) ($order->amount ?? $order->total_payment);
+        $fee = (int) ($order->fee ?? 0);
+        $totalDibayar = $price + $fee;
+        $paidAt = $order->paid_at ?? now();
+        $tanggal = $this->formatTanggalIndo($paidAt);
+
+        $text = "╭────〔 <b>TRANSAKSI SUKSES</b> 〕─\n";
+        $text .= "\n";
+        $text .= '┊・Pay ID : '.htmlspecialchars($payId)."\n";
+        $text .= '┊・Kode Unik : <code>'.htmlspecialchars($order->order_code)."</code>\n";
+        $text .= '┊・Nama Produk : '.htmlspecialchars($firstProductName)."\n";
+        $text .= '┊・Nama Variasi : '.htmlspecialchars($firstVariantName)."\n";
+        $text .= "┊・ID Buyer : {$order->user->id}\n";
+        $text .= '┊・Nomor Buyer : '.htmlspecialchars((string) $chatId)."\n";
+        $text .= "┊・Jumlah Beli : {$totalQty}\n";
+        $text .= "┊・Jumlah Akun didapat : {$accountsAssigned}\n";
+        $text .= '┊・Harga : '.number_format($price, 0, ',', '.')."\n";
+        $text .= '┊・Fee : '.number_format($fee, 0, ',', '.')."\n";
+        $text .= '┊・Total Dibayar : '.number_format($totalDibayar, 0, ',', '.')."\n";
+        $text .= "┊・Methode Pay : QRIS auto\n";
+        $text .= "┊・Tanggal/Jam Transaksi : {$tanggal}\n";
+        $text .= "╰┈┈┈┈┈┈┈┈\n\n";
         $text .= "<b>Akun premium kamu:</b>\n\n";
 
         $hasAny = false;
@@ -858,14 +1003,14 @@ class TelegramBotService
             $no = $i + 1;
             $productName = $item->variant?->product?->name ?? $item->product?->name ?? 'Produk';
             $variantName = $item->variant?->name ?? '';
-            $text .= "<b>{$no}. " . htmlspecialchars($productName) . " — " . htmlspecialchars($variantName) . "</b>\n";
+            $text .= "<b>{$no}. ".htmlspecialchars($productName).' — '.htmlspecialchars($variantName)."</b>\n";
 
             if ($item->stock) {
                 $hasAny = true;
-                $text .= "📧 Email: <code>" . htmlspecialchars($item->stock->email_or_phone) . "</code>\n";
-                $text .= "🔑 Password: <code>" . htmlspecialchars($item->stock->password) . "</code>\n";
+                $text .= '📧 Email: <code>'.htmlspecialchars($item->stock->email_or_phone)."</code>\n";
+                $text .= '🔑 Password: <code>'.htmlspecialchars($item->stock->password)."</code>\n";
                 if ($item->stock->additional_info) {
-                    $text .= "ℹ Info: " . htmlspecialchars($item->stock->additional_info) . "\n";
+                    $text .= 'ℹ Info: '.htmlspecialchars($item->stock->additional_info)."\n";
                 }
             } else {
                 $text .= "⏳ Akun masih diproses oleh admin. Cek kembali nanti.\n";
@@ -874,17 +1019,32 @@ class TelegramBotService
         }
 
         if (! $hasAny) {
-            $text .= "<i>Sedang diproses oleh admin. Tunggu sebentar ya.</i>";
+            $text .= '<i>Sedang diproses oleh admin. Tunggu sebentar ya.</i>';
         }
 
         $rows = [
-            [['text' => '🔗 Buka Invoice', 'url' => url('/invoice/' . $order->order_code)]],
+            [['text' => '🔗 Buka Invoice', 'url' => url('/invoice/'.$order->order_code)]],
             [['text' => '🏠 Menu Utama', 'callback_data' => 'menu']],
         ];
 
         $this->sendMessage($chatId, $text, [
             'reply_markup' => json_encode(['inline_keyboard' => $rows]),
         ]);
+    }
+
+    protected function formatTanggalIndo(\DateTimeInterface $dt): string
+    {
+        $bulan = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+        ];
+        $d = (int) $dt->format('j');
+        $m = (int) $dt->format('n');
+        $y = $dt->format('Y');
+        $jam = $dt->format('H.i');
+
+        return "{$d} {$bulan[$m]} {$y} pukul {$jam}";
     }
 
     public function notifyAdmin(string $text): void
