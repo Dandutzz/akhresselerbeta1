@@ -7,6 +7,7 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -15,10 +16,17 @@ class User extends Authenticatable implements FilamentUser
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
+    public const ROLE_ADMIN = 'admin';
+
+    public const ROLE_RESELLER = 'reseller';
+
+    public const ROLE_CUSTOMER = 'customer';
+
     // is_admin & balance SENGAJA tidak dimasukkan ke $fillable untuk mencegah
     // mass-assignment privilege escalation. is_admin di-set lewat seeder /
     // command / UserResource (eksplisit). balance HARUS via WalletService
-    // (atomic + audit trail).
+    // (atomic + audit trail). role bisa diisi via Filament panel (admin
+    // form & reseller register handler) — bukan endpoint publik.
     protected $fillable = [
         'name',
         'email',
@@ -30,6 +38,9 @@ class User extends Authenticatable implements FilamentUser
         'last_login_at',
         'telegram_chat_id',
         'telegram_username',
+        'role',
+        'reseller_slug',
+        'approved_at',
     ];
 
     protected $hidden = [
@@ -47,21 +58,77 @@ class User extends Authenticatable implements FilamentUser
             'banned_at' => 'datetime',
             'balance' => 'integer',
             'last_login_at' => 'datetime',
+            'approved_at' => 'datetime',
         ];
     }
 
+    public function isAdmin(): bool
+    {
+        return $this->role === self::ROLE_ADMIN || (bool) $this->is_admin;
+    }
+
+    public function isReseller(): bool
+    {
+        return $this->role === self::ROLE_RESELLER;
+    }
+
+    public function isCustomer(): bool
+    {
+        return $this->role === self::ROLE_CUSTOMER;
+    }
+
     /**
-     * Hanya user dengan flag is_admin = true (dan TIDAK banned) yang boleh
-     * akses panel Filament. Kalau admin di-ban, juga gak bisa masuk.
+     * Reseller sudah disetujui admin untuk login ke panel reseller.
+     * Selama belum approved, login boleh tapi panel reseller akan menolak.
+     */
+    public function isApprovedReseller(): bool
+    {
+        return $this->isReseller() && ! is_null($this->approved_at) && ! $this->is_banned;
+    }
+
+    /**
+     * Akses panel multi-tenant:
+     *  - panel admin → admin only (tidak banned)
+     *  - panel reseller → reseller only (sudah approved + tidak banned)
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return (bool) $this->is_admin && ! $this->is_banned;
+        if ($this->is_banned) {
+            return false;
+        }
+
+        return match ($panel->getId()) {
+            'admin' => $this->isAdmin(),
+            'reseller' => $this->isApprovedReseller(),
+            default => false,
+        };
     }
 
     public function walletTransactions(): HasMany
     {
         return $this->hasMany(WalletTransaction::class);
+    }
+
+    public function resellerSettings(): HasOne
+    {
+        return $this->hasOne(ResellerSetting::class);
+    }
+
+    public function subscription(): HasOne
+    {
+        return $this->hasOne(ResellerSubscription::class);
+    }
+
+    /** Produk yang dimiliki sebagai reseller (bukan order yang dia beli). */
+    public function ownedProducts(): HasMany
+    {
+        return $this->hasMany(Product::class, 'reseller_id');
+    }
+
+    /** Order masuk ke reseller ini (revenue). */
+    public function ownedOrders(): HasMany
+    {
+        return $this->hasMany(Order::class, 'reseller_id');
     }
 
     /**
@@ -102,7 +169,8 @@ class User extends Authenticatable implements FilamentUser
      */
     public function linkGuestOrders(): int
     {
-        return Order::whereNull('user_id')
+        return Order::withoutResellerScope()
+            ->whereNull('user_id')
             ->where('customer_email', $this->email)
             ->update(['user_id' => $this->id]);
     }

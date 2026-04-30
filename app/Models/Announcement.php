@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToReseller;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 
 class Announcement extends Model
 {
+    use BelongsToReseller;
+
     protected $fillable = [
+        'reseller_id',
         'title',
         'body',
         'cta_label',

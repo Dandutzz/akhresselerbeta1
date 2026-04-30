@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToReseller;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Stock extends Model
 {
-    use HasFactory;
+    use BelongsToReseller, HasFactory;
 
     protected $fillable = [
+        'reseller_id',
         'product_variant_id',
         'email_or_phone',
         'password',

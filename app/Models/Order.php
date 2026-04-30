@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToReseller;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,6 +11,8 @@ use Illuminate\Support\Str;
 
 class Order extends Model
 {
+    use BelongsToReseller;
+
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_PAID = 'paid';
@@ -28,6 +31,7 @@ class Order extends Model
 
     protected $fillable = [
         'order_code',
+        'reseller_id',
         'user_id',
         'product_id',
         'product_variant_id',
@@ -133,16 +137,18 @@ class Order extends Model
      */
     public static function generateOrderCode(): string
     {
+        // Cek unique secara global (tanpa reseller scope) supaya kode order
+        // unik di seluruh platform, bukan hanya per-reseller.
         for ($i = 0; $i < 5; $i++) {
             $code = 'AKH-'.now()->format('Ymd').'-'.strtoupper(Str::random(6));
-            if (! self::where('order_code', $code)->exists()) {
+            if (! self::withoutResellerScope()->where('order_code', $code)->exists()) {
                 return $code;
             }
         }
 
         do {
             $fallback = 'AKH-'.now()->format('Ymd').'-'.strtoupper(Str::random(10));
-        } while (self::where('order_code', $fallback)->exists());
+        } while (self::withoutResellerScope()->where('order_code', $fallback)->exists());
 
         return $fallback;
     }
