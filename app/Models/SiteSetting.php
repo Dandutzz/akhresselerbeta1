@@ -32,6 +32,11 @@ class SiteSetting extends Model
         'fonnte_credentials_template',
         'fonnte_admin_number',
         'fonnte_webhook_secret',
+        'pakasir_project',
+        'pakasir_api_key',
+        'pakasir_qris_only',
+        'pakasir_order_expiry_minutes',
+        'pakasir_base_url',
         'fake_sold_enabled',
         'floating_notif_enabled',
         'floating_notif_use_real',
@@ -46,12 +51,15 @@ class SiteSetting extends Model
         'seo_robots',
     ];
 
-    /** Fonnte API key disimpan terenkripsi (AES-256-CBC) — sensitive credential. */
+    /** Sensitive credentials (Fonnte/Pakasir API key) disimpan terenkripsi AES-256-CBC. */
     protected function casts(): array
     {
         return [
             'fonnte_api_key' => 'encrypted',
             'fonnte_auto_send_credentials' => 'boolean',
+            'pakasir_api_key' => 'encrypted',
+            'pakasir_qris_only' => 'boolean',
+            'pakasir_order_expiry_minutes' => 'integer',
             'fake_sold_enabled' => 'boolean',
             'floating_notif_enabled' => 'boolean',
             'floating_notif_use_real' => 'boolean',

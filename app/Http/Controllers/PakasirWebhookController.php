@@ -44,7 +44,8 @@ class PakasirWebhookController extends Controller
 
         // Pastikan project sesuai dengan konfigurasi — mencegah webhook dari
         // project lain yang secara tidak sengaja/malicious menabrak sistem kita.
-        if (config('pakasir.project') && $project !== config('pakasir.project')) {
+        $configuredProject = $this->pakasir->projectSlug();
+        if ($configuredProject && $project !== $configuredProject) {
             Log::warning('Pakasir webhook: project mismatch', compact('project', 'orderCode'));
 
             return response()->json(['ok' => false, 'error' => 'project_mismatch'], 403);

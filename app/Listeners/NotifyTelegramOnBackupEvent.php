@@ -68,12 +68,10 @@ class NotifyTelegramOnBackupEvent
 
     protected function send(string $html): void
     {
-        $adminChatId = (string) config('services.telegram.admin_chat_id');
-        if ($adminChatId === '') {
-            return;
-        }
         try {
-            $this->telegram->sendMessage($adminChatId, $html);
+            // notifyAdmin() lookup admin_chat_id sendiri & otomatis pakai bot
+            // notif terpisah (TELEGRAM_NOTIF_BOT_TOKEN) kalau dikonfigurasi.
+            $this->telegram->notifyAdmin($html);
         } catch (\Throwable $e) {
             Log::warning('Failed to send Telegram backup notification', ['msg' => $e->getMessage()]);
         }

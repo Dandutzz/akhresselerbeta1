@@ -22,10 +22,18 @@ class TelegramBotService
 {
     protected string $apiBase;
 
+    /** Bot terpisah untuk notif internal admin. Null kalau tidak dikonfigurasi. */
+    protected ?string $notifApiBase = null;
+
     public function __construct()
     {
         $token = config('services.telegram.bot_token');
         $this->apiBase = "https://api.telegram.org/bot{$token}";
+
+        $notifToken = config('services.telegram.notif_bot_token');
+        if (! empty($notifToken)) {
+            $this->notifApiBase = "https://api.telegram.org/bot{$notifToken}";
+        }
     }
 
     /* =======================================================================
@@ -34,10 +42,16 @@ class TelegramBotService
 
     public function call(string $method, array $params = []): array
     {
+        return $this->callOn($this->apiBase, $method, $params);
+    }
+
+    /** Versi `call()` yang pakai base URL tertentu (mis. bot notif terpisah). */
+    protected function callOn(string $apiBase, string $method, array $params = []): array
+    {
         try {
             $res = Http::asJson()
                 ->timeout(15)
-                ->post("{$this->apiBase}/{$method}", $params);
+                ->post("{$apiBase}/{$method}", $params);
 
             $data = $res->json() ?? [];
 
@@ -677,7 +691,7 @@ class TelegramBotService
                     // Bot order tetap punya TTL agar dipungut oleh job auto-expire,
                     // konsisten dengan checkout web/cart.
                     'expired_at' => now()->addMinutes(
-                        (int) config('pakasir.order_expiry_minutes', 60)
+                        PakasirService::orderExpiryMinutes()
                     ),
                 ]);
 
@@ -1089,7 +1103,17 @@ class TelegramBotService
         if (! $adminChatId) {
             return;
         }
-        $this->sendMessage((string) $adminChatId, $text);
+
+        // Pakai bot notif terpisah kalau dikonfigurasi (TELEGRAM_NOTIF_BOT_TOKEN),
+        // fallback ke bot utama supaya backward-compatible.
+        $apiBase = $this->notifApiBase ?? $this->apiBase;
+
+        $this->callOn($apiBase, 'sendMessage', [
+            'chat_id' => (string) $adminChatId,
+            'text' => $text,
+            'parse_mode' => 'HTML',
+            'disable_web_page_preview' => true,
+        ]);
     }
 
     /* =======================================================================
