@@ -20,6 +20,8 @@ class TelegramBotState extends Model
 
     public const STATE_AWAITING_PAYMENT = 'awaiting_payment';
 
+    public const STATE_AWAITING_BROADCAST = 'awaiting_broadcast';
+
     public static function for(string $chatId): self
     {
         return self::firstOrCreate(

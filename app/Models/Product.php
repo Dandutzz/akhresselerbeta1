@@ -24,6 +24,7 @@ class Product extends Model
         'sold_count',
         'fake_sold_count',
         'category_id',
+        'sort_order',
     ];
 
     protected function casts(): array
@@ -34,6 +35,7 @@ class Product extends Model
             'is_best_seller' => 'boolean',
             'sold_count' => 'integer',
             'fake_sold_count' => 'integer',
+            'sort_order' => 'integer',
         ];
     }
 

@@ -7,6 +7,7 @@ use App\Models\WalletTransaction;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\HtmlString;
 
 class EditUser extends EditRecord
 {
@@ -44,7 +45,7 @@ class EditUser extends EditRecord
                 ->modalContent(function () {
                     $txs = $this->record->walletTransactions()->latest()->limit(100)->get();
                     if ($txs->isEmpty()) {
-                        return new \Illuminate\Support\HtmlString('<div class="py-8 text-center text-slate-400">Belum ada transaksi saldo</div>');
+                        return new HtmlString('<div class="py-8 text-center text-slate-400">Belum ada transaksi saldo</div>');
                     }
                     $rows = $txs->map(function (WalletTransaction $tx) {
                         $amt = number_format(abs($tx->amount), 0, ',', '.');
@@ -63,7 +64,7 @@ class EditUser extends EditRecord
                         '<thead><tr class="border-b bg-slate-50"><th class="py-2 px-3 text-left">Waktu</th><th class="py-2 px-3 text-left">Tipe</th><th class="py-2 px-3 text-right">Nominal</th><th class="py-2 px-3 text-left">Saldo Setelah</th></tr></thead>'.
                         '<tbody>'.$rows.'</tbody></table></div>';
 
-                    return new \Illuminate\Support\HtmlString($html);
+                    return new HtmlString($html);
                 }),
         ];
     }

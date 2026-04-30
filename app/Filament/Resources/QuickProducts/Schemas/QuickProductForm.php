@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\QuickProducts\Schemas;
 
+use App\Models\ProductVariant;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
@@ -144,7 +145,7 @@ class QuickProductForm
                                             if (! $variantId) {
                                                 return;
                                             }
-                                            $variant = \App\Models\ProductVariant::find($variantId);
+                                            $variant = ProductVariant::find($variantId);
                                             if (! $variant) {
                                                 return;
                                             }
@@ -153,6 +154,7 @@ class QuickProductForm
                                                 ->get()
                                                 ->map(function ($s) {
                                                     $base = $s->email_or_phone.'|'.$s->password;
+
                                                     return $s->additional_info ? $base.'|'.$s->additional_info : $base;
                                                 })->implode("\n");
                                             $set('_bulk_stock', $lines);
@@ -171,7 +173,7 @@ class QuickProductForm
                                     ->helperText(function (callable $get) {
                                         $isEdit = (bool) $get('_replace_stock');
                                         $variantId = $get('id');
-                                        $variant = $variantId ? \App\Models\ProductVariant::find($variantId) : null;
+                                        $variant = $variantId ? ProductVariant::find($variantId) : null;
                                         $available = $variant ? $variant->stocks()->where('is_sold', false)->count() : 0;
                                         $sold = $variant ? $variant->stocks()->where('is_sold', true)->count() : 0;
                                         $stats = $variant ? " (saat ini: {$available} tersedia, {$sold} terkirim)" : '';

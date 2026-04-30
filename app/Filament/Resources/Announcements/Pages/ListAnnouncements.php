@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Filament\Resources\Products\Pages;
+namespace App\Filament\Resources\Announcements\Pages;
 
-use App\Filament\Resources\Products\ProductResource;
+use App\Filament\Resources\Announcements\AnnouncementResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
-class ListProducts extends ListRecords
+class ListAnnouncements extends ListRecords
 {
-    protected static string $resource = ProductResource::class;
+    protected static string $resource = AnnouncementResource::class;
 
     public bool $isTableReordering = true;
 

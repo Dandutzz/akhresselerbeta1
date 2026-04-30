@@ -186,6 +186,21 @@ class TelegramBotService
             return;
         }
 
+        if ($text === '/broadcast') {
+            $this->handleBroadcastStart($chatId);
+
+            return;
+        }
+
+        // State-based handler: kalau admin sedang menyusun broadcast,
+        // semua pesan teks berikutnya jadi konten broadcast.
+        $state = TelegramBotState::for($chatId);
+        if ($state->state === TelegramBotState::STATE_AWAITING_BROADCAST && $this->isAdminChat($chatId)) {
+            $this->handleBroadcastDraft($chatId, $text, $state);
+
+            return;
+        }
+
         // Default: balas dengan main menu
         $this->sendMessage($chatId, 'Hai! Aku gak ngerti perintah <i>'.htmlspecialchars($text).'</i>. Pilih dari menu di bawah ya.', $this->mainMenuKeyboard());
     }
@@ -290,6 +305,7 @@ class TelegramBotService
         $page = max(1, min($page, $totalPages));
 
         $products = Product::query()
+            ->orderBy('sort_order', 'asc')
             ->orderBy('name')
             ->skip(($page - 1) * $perPage)
             ->take($perPage)
@@ -914,6 +930,11 @@ class TelegramBotService
 
             return;
         }
+        if ($data === 'bcast_confirm' || $data === 'bcast_cancel') {
+            $this->handleBroadcastConfirm($chatId, $data === 'bcast_confirm');
+
+            return;
+        }
     }
 
     protected function cartItemAction(string $chatId, string $data): void
@@ -990,10 +1011,6 @@ class TelegramBotService
         $firstVariantName = $first->variant?->name ?? '';
         $totalQty = (int) $items->sum('qty');
         $accountsAssigned = $items->filter(fn ($i) => $i->stock)->sum('qty');
-        $payId = (string) ($order->pakasir_payment_number ?? $order->payment_qr_string ?? 'undefined');
-        if (strlen($payId) > 24) {
-            $payId = substr($payId, 0, 8).'…'.substr($payId, -8);
-        }
         $price = (int) ($order->amount ?? $order->total_payment);
         $fee = (int) ($order->fee ?? 0);
         $totalDibayar = $price + $fee;
@@ -1002,8 +1019,7 @@ class TelegramBotService
 
         $text = "╭────〔 <b>TRANSAKSI SUKSES</b> 〕─\n";
         $text .= "\n";
-        $text .= '┊・Pay ID : '.htmlspecialchars($payId)."\n";
-        $text .= '┊・Kode Unik : <code>'.htmlspecialchars($order->order_code)."</code>\n";
+        $text .= '┊・Invoice ID : <code>'.htmlspecialchars($order->order_code)."</code>\n";
         $text .= '┊・Nama Produk : '.htmlspecialchars($firstProductName)."\n";
         $text .= '┊・Nama Variasi : '.htmlspecialchars($firstVariantName)."\n";
         $text .= "┊・ID Buyer : {$order->user->id}\n";
@@ -1074,5 +1090,122 @@ class TelegramBotService
             return;
         }
         $this->sendMessage((string) $adminChatId, $text);
+    }
+
+    /* =======================================================================
+     * Broadcast (admin only)
+     * ======================================================================= */
+
+    protected function isAdminChat(string $chatId): bool
+    {
+        $adminChatId = (string) config('services.telegram.admin_chat_id');
+
+        return $adminChatId !== '' && $chatId === $adminChatId;
+    }
+
+    /**
+     * Daftar chat_id penerima broadcast: gabungan user yang sudah linked +
+     * chat yang pernah berinteraksi dengan bot. Filter unique.
+     *
+     * @return array<int,string>
+     */
+    public function broadcastRecipients(): array
+    {
+        $linked = User::whereNotNull('telegram_chat_id')->pluck('telegram_chat_id')->all();
+        $interacted = TelegramBotState::pluck('chat_id')->all();
+        $all = array_unique(array_filter(array_map('strval', array_merge($linked, $interacted))));
+
+        return array_values($all);
+    }
+
+    protected function handleBroadcastStart(string $chatId): void
+    {
+        if (! $this->isAdminChat($chatId)) {
+            $this->sendMessage($chatId, '⛔ Perintah ini hanya untuk admin.');
+
+            return;
+        }
+
+        TelegramBotState::for($chatId)->setState(TelegramBotState::STATE_AWAITING_BROADCAST, []);
+
+        $count = count($this->broadcastRecipients());
+        $this->sendMessage(
+            $chatId,
+            "📢 <b>Broadcast Mode</b>\n\n".
+            "Kirim pesan yang ingin di-broadcast (boleh HTML: <code>&lt;b&gt;</code>, <code>&lt;i&gt;</code>, <code>&lt;a&gt;</code>).\n".
+            "Penerima saat ini: <b>{$count}</b> chat.\n\n".
+            'Ketik /batal untuk membatalkan.'
+        );
+    }
+
+    protected function handleBroadcastDraft(string $chatId, string $text, TelegramBotState $state): void
+    {
+        if ($text === '') {
+            $this->sendMessage($chatId, '⚠ Pesan kosong. Kirim teks yang ingin di-broadcast atau /batal.');
+
+            return;
+        }
+
+        $count = count($this->broadcastRecipients());
+        $payload = $state->payload ?? [];
+        $payload['broadcast_text'] = $text;
+        $state->setState(TelegramBotState::STATE_AWAITING_BROADCAST, $payload);
+
+        $preview = "📢 <b>Preview Broadcast</b>\n\n".
+            "──────────────\n".
+            $text."\n".
+            "──────────────\n\n".
+            "Akan dikirim ke <b>{$count}</b> chat. Konfirmasi?";
+
+        $this->sendMessage($chatId, $preview, [
+            'reply_markup' => [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '✅ Kirim', 'callback_data' => 'bcast_confirm'],
+                        ['text' => '❌ Batal', 'callback_data' => 'bcast_cancel'],
+                    ],
+                ],
+            ],
+        ]);
+    }
+
+    protected function handleBroadcastConfirm(string $chatId, bool $confirmed): void
+    {
+        if (! $this->isAdminChat($chatId)) {
+            return;
+        }
+
+        $state = TelegramBotState::for($chatId);
+        $text = (string) ($state->payload['broadcast_text'] ?? '');
+
+        if (! $confirmed || $text === '') {
+            $state->reset();
+            $this->sendMessage($chatId, '❌ Broadcast dibatalkan.');
+
+            return;
+        }
+
+        $recipients = $this->broadcastRecipients();
+        $sent = 0;
+        $failed = 0;
+        foreach ($recipients as $rid) {
+            $res = $this->sendMessage((string) $rid, $text);
+            if ($res['ok'] ?? false) {
+                $sent++;
+            } else {
+                $failed++;
+            }
+            // Hindari rate-limit Telegram (~30 msg/sec)
+            usleep(50_000);
+        }
+
+        $state->reset();
+        $this->sendMessage(
+            $chatId,
+            "✅ <b>Broadcast selesai</b>\n\n".
+            "Terkirim: <b>{$sent}</b>\n".
+            "Gagal: <b>{$failed}</b>\n".
+            'Total: '.count($recipients)
+        );
     }
 }

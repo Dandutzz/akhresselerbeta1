@@ -48,7 +48,8 @@ class ProductsTable
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->defaultSort('updated_at', 'desc')
+            ->defaultSort('sort_order', 'asc')
+            ->reorderable('sort_order')
             ->filters([
                 //
             ])
