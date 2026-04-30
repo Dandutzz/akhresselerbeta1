@@ -43,6 +43,7 @@ class Order extends Model
         'payment_method_requested',
         'payment_ref',
         'payment_qr_string',
+        'telegram_qr_message_id',
         'source',
         'status',
         'paid_at',
