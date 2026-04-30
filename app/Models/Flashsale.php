@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToReseller;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Flashsale extends Model
 {
+    use BelongsToReseller;
+
     protected $fillable = [
+        'reseller_id',
         'name',
         'product_variant_id',
         'flash_price',

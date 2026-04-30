@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToReseller;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
@@ -9,7 +10,10 @@ use Illuminate\Support\Str;
 
 class Testimonial extends Model
 {
+    use BelongsToReseller;
+
     protected $fillable = [
+        'reseller_id',
         'name',
         'role',
         'rating',

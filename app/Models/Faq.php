@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToReseller;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class Faq extends Model
 {
-    protected $fillable = ['question', 'answer', 'sort_order', 'is_active'];
+    use BelongsToReseller;
+
+    protected $fillable = ['reseller_id', 'question', 'answer', 'sort_order', 'is_active'];
 
     protected function casts(): array
     {

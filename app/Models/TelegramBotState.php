@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToReseller;
 use Illuminate\Database\Eloquent\Model;
 
 class TelegramBotState extends Model
 {
-    protected $fillable = ['chat_id', 'state', 'payload'];
+    use BelongsToReseller;
+
+    protected $fillable = ['reseller_id', 'chat_id', 'state', 'payload'];
 
     protected $casts = [
         'payload' => 'array',

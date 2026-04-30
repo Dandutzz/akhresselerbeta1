@@ -2,16 +2,20 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToReseller;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class Voucher extends Model
 {
+    use BelongsToReseller;
+
     public const TYPE_PERCENT = 'percent';
 
     public const TYPE_FIXED = 'fixed';
 
     protected $fillable = [
+        'reseller_id',
         'code',
         'name',
         'type',

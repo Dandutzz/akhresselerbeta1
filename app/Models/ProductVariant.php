@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToReseller;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProductVariant extends Model
 {
+    use BelongsToReseller;
+
     public const SHARE_SHARING = 'sharing';
 
     public const SHARE_PRIVATE = 'private';
@@ -15,6 +18,7 @@ class ProductVariant extends Model
     public const SHARE_SHARING_ANTILIMIT = 'sharing_antilimit';
 
     protected $fillable = [
+        'reseller_id',
         'product_id',
         'name',
         'price',
