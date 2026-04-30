@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Voucher;
 use App\Services\PakasirService;
+use App\Services\TelegramBotService;
 use App\Support\Audit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -119,7 +120,7 @@ class CheckoutController extends Controller
                 'status' => Order::STATUS_PENDING,
                 'source' => Order::SOURCE_WEB,
                 'expired_at' => now()->addMinutes(
-                    (int) config('pakasir.order_expiry_minutes', 60)
+                    PakasirService::orderExpiryMinutes()
                 ),
             ]);
 
@@ -146,6 +147,8 @@ class CheckoutController extends Controller
             'variant' => $variant->name,
             'product' => $variant->product?->name,
         ]);
+
+        app(TelegramBotService::class)->notifyAdminOrderCreated($order, 'Web Checkout');
 
         // Redirect ke invoice publik kita sendiri — QRIS akan di-render di
         // halaman tersebut via PakasirService::createQrisTransaction(). User

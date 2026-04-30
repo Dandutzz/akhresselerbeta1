@@ -40,6 +40,10 @@ return [
         'bot_username' => env('TELEGRAM_BOT_USERNAME'),
         'admin_chat_id' => env('TELEGRAM_ADMIN_CHAT_ID'),
         'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
+        // Bot terpisah khusus untuk push notifikasi internal ke admin
+        // (mis. order baru, backup berhasil/gagal). Kalau kosong, notif
+        // dikirim lewat bot utama (TELEGRAM_BOT_TOKEN).
+        'notif_bot_token' => env('TELEGRAM_NOTIF_BOT_TOKEN'),
     ],
 
 ];

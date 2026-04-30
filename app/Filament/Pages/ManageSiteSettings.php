@@ -133,6 +133,40 @@ class ManageSiteSettings extends Page implements HasForms
                             ->columnSpanFull(),
                     ]),
 
+                Section::make('Pakasir Payment Gateway')
+                    ->description('Slug project & API key Pakasir. Daftar di https://pakasir.com/p/docs untuk dapat kredensial. Akan override ENV (PAKASIR_PROJECT/PAKASIR_API_KEY) kalau diisi.')
+                    ->columns(2)
+                    ->schema([
+                        TextInput::make('pakasir_project')
+                            ->label('Project Slug')
+                            ->placeholder('akhpremium')
+                            ->helperText('Slug project di dashboard Pakasir (bagian setelah /p/ di URL).')
+                            ->maxLength(64),
+                        TextInput::make('pakasir_api_key')
+                            ->label('API Key')
+                            ->password()
+                            ->revealable()
+                            ->placeholder('Paste API Key dari Pakasir → Project → API Key')
+                            ->helperText('Disimpan terenkripsi (AES-256-CBC) di DB.'),
+                        Toggle::make('pakasir_qris_only')
+                            ->label('Batasi metode pembayaran ke QRIS saja')
+                            ->helperText('Kalau ON, halaman pembayaran Pakasir hanya menampilkan QRIS. Kalau OFF, semua metode (QRIS, VA, Wallet) ditampilkan.')
+                            ->default(false),
+                        TextInput::make('pakasir_order_expiry_minutes')
+                            ->label('Masa Berlaku Order (menit)')
+                            ->numeric()
+                            ->minValue(5)
+                            ->maxValue(1440)
+                            ->default(60)
+                            ->helperText('Order yang belum dibayar dalam waktu ini akan otomatis di-expire.'),
+                        TextInput::make('pakasir_base_url')
+                            ->label('Base URL (opsional)')
+                            ->placeholder('https://app.pakasir.com')
+                            ->helperText('Kosongkan untuk pakai default. Hanya isi kalau Pakasir kasih URL khusus / sandbox.')
+                            ->url()
+                            ->columnSpanFull(),
+                    ]),
+
                 Section::make('Sosial Proof — Fake Terjual')
                     ->description('Jumlah terjual palsu dijumlahkan dengan terjual asli. Atur per produk di Resource Produk → Fake Sold Count. Hanya naikkan secara konsisten — jangan diturunkan.')
                     ->columns(1)

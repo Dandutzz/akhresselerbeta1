@@ -22,10 +22,18 @@ class TelegramBotService
 {
     protected string $apiBase;
 
+    /** Bot terpisah untuk notif internal admin. Null kalau tidak dikonfigurasi. */
+    protected ?string $notifApiBase = null;
+
     public function __construct()
     {
         $token = config('services.telegram.bot_token');
         $this->apiBase = "https://api.telegram.org/bot{$token}";
+
+        $notifToken = config('services.telegram.notif_bot_token');
+        if (! empty($notifToken)) {
+            $this->notifApiBase = "https://api.telegram.org/bot{$notifToken}";
+        }
     }
 
     /* =======================================================================
@@ -34,10 +42,16 @@ class TelegramBotService
 
     public function call(string $method, array $params = []): array
     {
+        return $this->callOn($this->apiBase, $method, $params);
+    }
+
+    /** Versi `call()` yang pakai base URL tertentu (mis. bot notif terpisah). */
+    protected function callOn(string $apiBase, string $method, array $params = []): array
+    {
         try {
             $res = Http::asJson()
                 ->timeout(15)
-                ->post("{$this->apiBase}/{$method}", $params);
+                ->post("{$apiBase}/{$method}", $params);
 
             $data = $res->json() ?? [];
 
@@ -677,7 +691,7 @@ class TelegramBotService
                     // Bot order tetap punya TTL agar dipungut oleh job auto-expire,
                     // konsisten dengan checkout web/cart.
                     'expired_at' => now()->addMinutes(
-                        (int) config('pakasir.order_expiry_minutes', 60)
+                        PakasirService::orderExpiryMinutes()
                     ),
                 ]);
 
@@ -756,12 +770,7 @@ class TelegramBotService
             ]);
         }
 
-        // Notif admin
-        $this->notifyAdmin("🆕 <b>Order baru via Telegram Bot</b>\n\n"
-            .'👤 '.htmlspecialchars($user->name).' ('.htmlspecialchars($user->email).")\n"
-            ."🆔 <code>{$order->order_code}</code>\n"
-            .'💵 Rp '.number_format($order->amount, 0, ',', '.')."\n"
-            .'📦 '.count($cart).' varian, total '.array_sum(array_column($cart, 'qty')).' akun');
+        $this->notifyAdminOrderCreated($order, 'Telegram Bot');
     }
 
     /* =======================================================================
@@ -1089,7 +1098,69 @@ class TelegramBotService
         if (! $adminChatId) {
             return;
         }
-        $this->sendMessage((string) $adminChatId, $text);
+
+        // Pakai bot notif terpisah kalau dikonfigurasi (TELEGRAM_NOTIF_BOT_TOKEN),
+        // fallback ke bot utama supaya backward-compatible.
+        $apiBase = $this->notifApiBase ?? $this->apiBase;
+
+        $this->callOn($apiBase, 'sendMessage', [
+            'chat_id' => (string) $adminChatId,
+            'text' => $text,
+            'parse_mode' => 'HTML',
+            'disable_web_page_preview' => true,
+        ]);
+    }
+
+    /**
+     * Push notif ke admin saat order baru dibuat (PENDING).
+     * Sumber: web checkout, web cart, atau Telegram bot. Tidak throw —
+     * gagal kirim hanya logged supaya tidak block flow checkout.
+     */
+    public function notifyAdminOrderCreated(Order $order, string $sourceLabel): void
+    {
+        try {
+            $order->loadMissing(['user', 'product', 'variant', 'items.product', 'items.variant']);
+
+            if ($order->items->isNotEmpty()) {
+                $lines = $order->items->map(fn ($i) => '• '.htmlspecialchars((string) ($i->product?->name ?? '-'))
+                    .' — '.htmlspecialchars((string) ($i->variant?->name ?? '-'))
+                    .' (×'.(int) $i->qty.')')->all();
+            } else {
+                $lines = ['• '.htmlspecialchars((string) ($order->product?->name ?? '-'))
+                    .' — '.htmlspecialchars((string) ($order->variant?->name ?? '-'))];
+            }
+
+            $customer = $order->user
+                ? ($order->user->name.' ('.$order->user->email.')')
+                : ((string) $order->customer_email.($order->customer_phone ? ' / '.$order->customer_phone : ''));
+
+            $this->notifyAdmin("🆕 <b>Order baru</b> via {$sourceLabel}\n\n"
+                .'🆔 <code>'.htmlspecialchars((string) $order->order_code)."</code>\n"
+                .'👤 '.htmlspecialchars($customer)."\n"
+                .implode("\n", $lines)."\n"
+                .'💵 Rp '.number_format((int) $order->total_payment, 0, ',', '.'));
+        } catch (\Throwable $e) {
+            Log::warning('notifyAdminOrderCreated failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /** Push notif ke admin saat order transisi ke PAID (semua source). */
+    public function notifyAdminOrderPaid(Order $order): void
+    {
+        try {
+            $order->loadMissing(['user']);
+            $customer = $order->user
+                ? ($order->user->name.' ('.$order->user->email.')')
+                : (string) $order->customer_email;
+
+            $this->notifyAdmin("💚 <b>Order PAID</b>\n\n"
+                .'🆔 <code>'.htmlspecialchars((string) $order->order_code)."</code>\n"
+                .'👤 '.htmlspecialchars($customer)."\n"
+                .'💵 Rp '.number_format((int) $order->total_payment, 0, ',', '.')."\n"
+                .'💳 '.htmlspecialchars((string) ($order->payment_method ?: 'pakasir')));
+        } catch (\Throwable $e) {
+            Log::warning('notifyAdminOrderPaid failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+        }
     }
 
     /* =======================================================================

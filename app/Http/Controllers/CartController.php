@@ -9,6 +9,7 @@ use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\Voucher;
 use App\Services\PakasirService;
+use App\Services\TelegramBotService;
 use App\Support\Audit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -234,7 +235,7 @@ class CartController extends Controller
                 'status' => Order::STATUS_PENDING,
                 'source' => Order::SOURCE_WEB,
                 'expired_at' => now()->addMinutes(
-                    (int) config('pakasir.order_expiry_minutes', 60)
+                    PakasirService::orderExpiryMinutes()
                 ),
             ]);
 
@@ -272,6 +273,8 @@ class CartController extends Controller
             'discount' => $discount,
             'total' => $total,
         ]);
+
+        app(TelegramBotService::class)->notifyAdminOrderCreated($order, 'Web Cart');
 
         // Redirect ke invoice publik kita sendiri — QRIS akan di-render di
         // halaman tersebut via PakasirService::createQrisTransaction(). User
