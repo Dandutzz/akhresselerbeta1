@@ -15,8 +15,8 @@ return new class extends Migration
             $table->unsignedInteger('flash_price');
             $table->unsignedInteger('quota')->default(0);
             $table->unsignedInteger('sold')->default(0);
-            $table->timestamp('start_at');
-            $table->timestamp('end_at');
+            $table->timestamp('start_at')->nullable();
+            $table->timestamp('end_at')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
