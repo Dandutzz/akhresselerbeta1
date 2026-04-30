@@ -98,7 +98,45 @@
             </dl>
 
             @if ($order->isPending())
-                <div class="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                @if (! empty($qris) && ! empty($qris['payment_number']))
+                    <div class="mt-6 bg-white border border-slate-200 rounded-xl p-5 text-center">
+                        <div class="flex items-center justify-center gap-2 mb-2">
+                            <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Bayar dengan QRIS</div>
+                            <span class="px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-bold">PAKASIR</span>
+                        </div>
+                        <div class="text-2xl font-extrabold text-slate-900 mb-3">
+                            Rp {{ number_format($order->total_payment, 0, ',', '.') }}
+                        </div>
+                        <div class="inline-block p-3 bg-white border border-slate-200 rounded-xl shadow-card">
+                            <canvas id="qris-canvas" class="block mx-auto" style="width: 240px; height: 240px;"></canvas>
+                        </div>
+                        <div class="mt-3 text-xs text-slate-500">
+                            Scan QR di atas pakai aplikasi e-wallet / m-banking (GoPay, OVO, Dana, BCA, dll).
+                        </div>
+                        <details class="mt-3 text-left">
+                            <summary class="text-xs text-slate-400 hover:text-slate-600">QR string (untuk debugging)</summary>
+                            <textarea readonly class="w-full mt-2 text-[10px] font-mono p-2 border border-slate-200 rounded bg-slate-50 break-all" rows="3">{{ $qris['payment_number'] }}</textarea>
+                        </details>
+                    </div>
+
+                    {{-- QR rendering pakai library qrcodejs (CDN, no-deps).
+                         Render saat DOMContentLoaded supaya canvas sudah ada. --}}
+                    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function () {
+                            var canvas = document.getElementById('qris-canvas');
+                            if (!canvas || typeof QRCode === 'undefined') return;
+                            QRCode.toCanvas(canvas, @json($qris['payment_number']), {
+                                width: 240,
+                                margin: 1,
+                                errorCorrectionLevel: 'M',
+                                color: { dark: '#0f172a', light: '#ffffff' },
+                            });
+                        });
+                    </script>
+                @endif
+
+                <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
                     <div class="font-bold">Menunggu pembayaran...</div>
                     <div class="mt-1">Halaman ini akan refresh otomatis setiap 15 detik. Jika sudah bayar tapi status belum berubah, tunggu beberapa detik lagi.</div>
                 </div>

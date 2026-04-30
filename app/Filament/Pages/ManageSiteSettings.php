@@ -176,6 +176,52 @@ class ManageSiteSettings extends Page implements HasForms
                         RichEditor::make('terms_html')->label('Ketentuan Order'),
                         Textarea::make('footer_about')->label('Tagline Footer')->rows(2),
                     ]),
+
+                Section::make('Custom SEO')
+                    ->description('Custom meta tags untuk SEO + sosial media (Open Graph). Kosongkan field untuk pakai default (nama toko + tagline).')
+                    ->columns(2)
+                    ->schema([
+                        TextInput::make('seo_meta_title')
+                            ->label('Meta Title')
+                            ->maxLength(255)
+                            ->placeholder('Akhpremium Store — Akun Premium Legal & Murah')
+                            ->helperText('Tag <title> halaman. Idealnya 50–60 karakter.')
+                            ->columnSpanFull(),
+                        Textarea::make('seo_meta_description')
+                            ->label('Meta Description')
+                            ->rows(3)
+                            ->maxLength(500)
+                            ->placeholder('Toko akun premium legal dengan auto-delivery 24 jam. Netflix, Spotify, CapCut, dan lainnya — harga termurah.')
+                            ->helperText('Tag <meta name="description">. Idealnya 120–160 karakter.')
+                            ->columnSpanFull(),
+                        TextInput::make('seo_meta_keywords')
+                            ->label('Meta Keywords')
+                            ->maxLength(1000)
+                            ->placeholder('akun premium, netflix murah, spotify premium, capcut pro')
+                            ->helperText('Pisahkan dengan koma. Modern Google sebagian besar mengabaikan ini, tapi search engine lain masih membaca.')
+                            ->columnSpanFull(),
+                        FileUpload::make('seo_og_image_path')
+                            ->label('Open Graph Image')
+                            ->image()
+                            ->imageEditor()
+                            ->disk('public')
+                            ->directory('site/seo')
+                            ->visibility('public')
+                            ->helperText('Gambar 1200x630 px untuk preview saat link di-share di sosial media (FB, WA, Telegram, X). Kosongkan = pakai logo.')
+                            ->columnSpanFull(),
+                        TextInput::make('seo_canonical_url')
+                            ->label('Canonical URL')
+                            ->url()
+                            ->maxLength(500)
+                            ->placeholder('https://akhpremium.test')
+                            ->helperText('URL utama website. Penting untuk SEO kalau site bisa diakses dari banyak domain.')
+                            ->columnSpanFull(),
+                        TextInput::make('seo_robots')
+                            ->label('Meta Robots')
+                            ->maxLength(64)
+                            ->placeholder('index,follow')
+                            ->helperText('Atur bagaimana search engine meng-crawl/index website. Kosongkan = default index,follow.'),
+                    ]),
             ]);
     }
 

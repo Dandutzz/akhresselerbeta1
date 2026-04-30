@@ -42,10 +42,18 @@ class InvoiceController extends Controller
             }
         }
 
+        // Fetch QR string buat di-render sebagai gambar di view (hanya saat
+        // status masih pending — kalau sudah PAID, QR tidak relevan lagi).
+        $qris = null;
+        if ($order->isPending() && $this->pakasir->isConfigured()) {
+            $qris = $this->pakasir->createQrisTransaction($order);
+        }
+
         return view('invoice', [
             'order' => $order,
             'credentials' => $this->decryptedCredentials($order),
             'itemCredentials' => $this->itemCredentials($order),
+            'qris' => $qris,
         ]);
     }
 

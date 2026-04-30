@@ -53,6 +53,78 @@ class PakasirService
     }
 
     /**
+     * Buat transaksi QRIS via Pakasir API & dapatkan QR string (EMVCo) untuk
+     * dirender sebagai gambar QR di sisi client. QR string disimpan di
+     * Order::payment_qr_string supaya tidak perlu hit API berulang.
+     *
+     * Docs: POST https://app.pakasir.com/api/transactioncreate/qris
+     *
+     * @return array{payment_number:string,total_payment:int,fee:int,expired_at:?string}|null
+     */
+    public function createQrisTransaction(Order $order): ?array
+    {
+        if (! $this->isConfigured()) {
+            return null;
+        }
+
+        // Sudah pernah di-fetch sebelumnya — pakai cache di Order.
+        if (! empty($order->payment_qr_string)) {
+            return [
+                'payment_number' => $order->payment_qr_string,
+                'total_payment' => (int) $order->total_payment,
+                'fee' => (int) ($order->fee ?? 0),
+                'expired_at' => optional($order->expired_at)->toIso8601String(),
+            ];
+        }
+
+        try {
+            $response = Http::timeout(15)
+                ->acceptJson()
+                ->asJson()
+                ->post($this->baseUrl.'/api/transactioncreate/qris', [
+                    'project' => $this->project,
+                    'order_id' => $order->order_code,
+                    'amount' => (int) $order->total_payment,
+                    'api_key' => $this->apiKey,
+                ]);
+        } catch (\Throwable $e) {
+            Log::error('Pakasir transactioncreate/qris error', [
+                'order_code' => $order->order_code,
+                'message' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        if (! $response->successful()) {
+            Log::warning('Pakasir transactioncreate/qris non-success', [
+                'order_code' => $order->order_code,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            return null;
+        }
+
+        $payment = $response->json('payment');
+        if (! is_array($payment) || empty($payment['payment_number'])) {
+            return null;
+        }
+
+        $order->forceFill([
+            'payment_qr_string' => $payment['payment_number'],
+            'payment_method_requested' => 'qris',
+        ])->save();
+
+        return [
+            'payment_number' => (string) $payment['payment_number'],
+            'total_payment' => (int) ($payment['total_payment'] ?? $order->total_payment),
+            'fee' => (int) ($payment['fee'] ?? 0),
+            'expired_at' => $payment['expired_at'] ?? null,
+        ];
+    }
+
+    /**
      * Panggil Transaction Detail API untuk mem-verifikasi status sebuah transaksi.
      * Dokumentasi Pakasir menganjurkan verifikasi ulang via API ini, TIDAK hanya
      * percaya pada payload webhook.

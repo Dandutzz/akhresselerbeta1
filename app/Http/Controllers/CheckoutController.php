@@ -117,6 +117,7 @@ class CheckoutController extends Controller
                 'fee' => $fee,
                 'total_payment' => $total,
                 'status' => Order::STATUS_PENDING,
+                'source' => Order::SOURCE_WEB,
                 'expired_at' => now()->addMinutes(
                     (int) config('pakasir.order_expiry_minutes', 60)
                 ),
@@ -159,5 +160,4 @@ class CheckoutController extends Controller
 
         return redirect()->away($paymentUrl);
     }
-
 }

@@ -38,6 +38,12 @@ class SiteSetting extends Model
         'floating_notif_use_fake',
         'floating_notif_interval_min',
         'floating_notif_interval_max',
+        'seo_meta_title',
+        'seo_meta_description',
+        'seo_meta_keywords',
+        'seo_og_image_path',
+        'seo_canonical_url',
+        'seo_robots',
     ];
 
     /** Fonnte API key disimpan terenkripsi (AES-256-CBC) — sensitive credential. */

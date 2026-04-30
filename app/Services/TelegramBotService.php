@@ -557,7 +557,8 @@ class TelegramBotService
                     'product_variant_id' => $expandedItems[0]['product_variant_id'],
                     'amount' => $subtotal,
                     'total_payment' => $subtotal,
-                    'status' => 'pending',
+                    'status' => Order::STATUS_PENDING,
+                    'source' => Order::SOURCE_TELEGRAM,
                     'customer_email' => $user->email,
                     'customer_phone' => $user->phone,
                     // Bot order tetap punya TTL agar dipungut oleh job auto-expire,
@@ -584,20 +585,57 @@ class TelegramBotService
         $state->reset();
 
         $invoiceUrl = url('/invoice/' . $order->order_code);
-        $text = "✅ <b>Order berhasil dibuat!</b>\n\n"
-            . "🆔 Kode: <code>{$order->order_code}</code>\n"
-            . "💵 Total: <b>Rp " . number_format($order->amount, 0, ',', '.') . "</b>\n\n"
-            . "🔗 <b>Buka link untuk bayar:</b>\n{$invoiceUrl}\n\n"
-            . "Setelah pembayaran berhasil, akun premium akan otomatis dikirim ke chat ini ✨";
+
+        // Coba ambil QRIS string dari Pakasir lalu kirim sebagai gambar QR ke
+        // chat. Kalau gagal (Pakasir belum dikonfigurasi / API error), fallback
+        // ke text + tombol "Buka Invoice" agar flow tetap jalan.
+        $qris = null;
+        try {
+            $pakasir = app(PakasirService::class);
+            if ($pakasir->isConfigured()) {
+                $qris = $pakasir->createQrisTransaction($order->fresh());
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Telegram bot: gagal fetch QRIS', [
+                'order_code' => $order->order_code,
+                'message' => $e->getMessage(),
+            ]);
+        }
 
         $rows = [
             [['text' => '🔗 Buka Invoice', 'url' => $invoiceUrl]],
             [['text' => '🏠 Menu Utama', 'callback_data' => 'menu']],
         ];
 
-        $this->sendMessage($chatId, $text, [
-            'reply_markup' => json_encode(['inline_keyboard' => $rows]),
-        ]);
+        if (! empty($qris['payment_number'])) {
+            $caption = "✅ <b>Scan QRIS untuk bayar</b>\n\n"
+                . "🆔 Kode: <code>{$order->order_code}</code>\n"
+                . "💵 Total: <b>Rp " . number_format($order->total_payment, 0, ',', '.') . "</b>\n\n"
+                . "Scan QR di atas pakai e-wallet / m-banking favorit kamu (GoPay, OVO, Dana, BCA, dll). "
+                . "Setelah pembayaran berhasil, akun premium akan otomatis dikirim ke chat ini ✨";
+
+            // Render QR via public QR-image service (api.qrserver.com) supaya
+            // bisa langsung dikirim sebagai foto Telegram tanpa dep server-side.
+            // QRIS payload (EMVCo) bukan data sensitif — sama dengan QR yang
+            // ditampilkan di halaman Pakasir.
+            $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=512x512&margin=10&data='
+                . rawurlencode($qris['payment_number']);
+
+            $this->sendPhoto($chatId, $qrUrl, $caption, [
+                'parse_mode' => 'HTML',
+                'reply_markup' => json_encode(['inline_keyboard' => $rows]),
+            ]);
+        } else {
+            $text = "✅ <b>Order berhasil dibuat!</b>\n\n"
+                . "🆔 Kode: <code>{$order->order_code}</code>\n"
+                . "💵 Total: <b>Rp " . number_format($order->amount, 0, ',', '.') . "</b>\n\n"
+                . "🔗 <b>Buka link untuk bayar:</b>\n{$invoiceUrl}\n\n"
+                . "Setelah pembayaran berhasil, akun premium akan otomatis dikirim ke chat ini ✨";
+
+            $this->sendMessage($chatId, $text, [
+                'reply_markup' => json_encode(['inline_keyboard' => $rows]),
+            ]);
+        }
 
         // Notif admin
         $this->notifyAdmin("🆕 <b>Order baru via Telegram Bot</b>\n\n"

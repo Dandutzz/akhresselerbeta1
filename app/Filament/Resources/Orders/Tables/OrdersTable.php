@@ -21,6 +21,22 @@ class OrdersTable
             ->modifyQueryUsing(fn (Builder $query) => $query->with(['items.product', 'items.variant', 'items.stock', 'product', 'variant', 'stock']))
             ->columns([
                 TextColumn::make('order_code')->label('Kode')->searchable()->copyable(),
+                TextColumn::make('source')
+                    ->label('Saluran')
+                    ->badge()
+                    ->formatStateUsing(fn ($state, $record) => $record->sourceLabel())
+                    ->icon(fn (?string $state) => match ($state) {
+                        Order::SOURCE_TELEGRAM => 'heroicon-o-paper-airplane',
+                        default => 'heroicon-o-globe-alt',
+                    })
+                    ->colors([
+                        'info' => Order::SOURCE_TELEGRAM,
+                        'gray' => Order::SOURCE_WEB,
+                    ])
+                    ->tooltip(fn ($record) => $record->source === Order::SOURCE_TELEGRAM
+                        ? 'Order dibuat lewat Telegram bot'
+                        : 'Order dibuat lewat website')
+                    ->sortable(),
                 TextColumn::make('product.name')
                     ->label('Produk')
                     ->searchable()
@@ -116,6 +132,13 @@ class OrdersTable
                     Order::STATUS_CANCELLED => 'Cancelled',
                     Order::STATUS_REFUNDED => 'Refunded',
                 ]),
+
+                SelectFilter::make('source')
+                    ->label('Saluran')
+                    ->options([
+                        Order::SOURCE_WEB => 'Web',
+                        Order::SOURCE_TELEGRAM => 'Telegram',
+                    ]),
 
                 Filter::make('needs_manual_delivery')
                     ->label('Perlu Kirim Akun Manual')

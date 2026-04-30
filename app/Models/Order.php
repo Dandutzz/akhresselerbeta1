@@ -22,6 +22,10 @@ class Order extends Model
 
     public const STATUS_REFUNDED = 'refunded';
 
+    public const SOURCE_WEB = 'web';
+
+    public const SOURCE_TELEGRAM = 'telegram';
+
     protected $fillable = [
         'order_code',
         'user_id',
@@ -36,7 +40,10 @@ class Order extends Model
         'fee',
         'total_payment',
         'payment_method',
+        'payment_method_requested',
         'payment_ref',
+        'payment_qr_string',
+        'source',
         'status',
         'paid_at',
         'expired_at',
@@ -106,6 +113,16 @@ class Order extends Model
     public function isPending(): bool
     {
         return $this->status === self::STATUS_PENDING;
+    }
+
+    /** Label readable buat kolom "source" — dipakai di admin/orders & invoice. */
+    public function sourceLabel(): string
+    {
+        return match ($this->source) {
+            self::SOURCE_TELEGRAM => 'Telegram',
+            self::SOURCE_WEB => 'Web',
+            default => ucfirst((string) $this->source),
+        };
     }
 
     /**
