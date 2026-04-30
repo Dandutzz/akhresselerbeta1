@@ -147,17 +147,11 @@ class CheckoutController extends Controller
             'product' => $variant->product?->name,
         ]);
 
-        if (! $this->pakasir->isConfigured()) {
-            return redirect()
-                ->route('invoice.show', $order->order_code)
-                ->with('warning', 'Payment gateway belum dikonfigurasi. Hubungi admin.');
-        }
-
-        $paymentUrl = $this->pakasir->buildPaymentUrl(
-            $order,
-            route('invoice.show', $order->order_code)
-        );
-
-        return redirect()->away($paymentUrl);
+        // Redirect ke invoice publik kita sendiri — QRIS akan di-render di
+        // halaman tersebut via PakasirService::createQrisTransaction(). User
+        // tidak perlu redirect ke halaman hosted Pakasir.
+        return redirect()
+            ->route('invoice.show', $order->order_code)
+            ->with('success', 'Order berhasil dibuat. Scan QRIS di bawah untuk membayar.');
     }
 }
