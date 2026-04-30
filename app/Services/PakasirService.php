@@ -3,29 +3,54 @@
 namespace App\Services;
 
 use App\Models\Order;
+use App\Models\SiteSetting;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Wrapper tipis untuk Pakasir Payment Gateway.
  *
+ * Konfigurasi diambil prioritas dari SiteSetting (admin panel),
+ * fallback ke config('pakasir.*') / env() biar deployment lama tetap jalan.
+ *
  * Referensi: https://pakasir.com/p/docs
  */
 class PakasirService
 {
+    protected bool $qrisOnly;
+
     public function __construct(
         protected ?string $project = null,
         protected ?string $apiKey = null,
         protected ?string $baseUrl = null,
+        ?bool $qrisOnly = null,
     ) {
-        $this->project ??= config('pakasir.project');
-        $this->apiKey ??= config('pakasir.api_key');
-        $this->baseUrl ??= rtrim((string) config('pakasir.base_url'), '/');
+        $site = SiteSetting::current();
+
+        $this->project ??= $site->pakasir_project ?: config('pakasir.project');
+        $this->apiKey ??= $site->pakasir_api_key ?: config('pakasir.api_key');
+        $this->baseUrl ??= rtrim((string) ($site->pakasir_base_url ?: config('pakasir.base_url')), '/');
+        $this->qrisOnly = $qrisOnly ?? ($site->pakasir_qris_only ?? (bool) config('pakasir.qris_only'));
     }
 
     public function isConfigured(): bool
     {
         return ! empty($this->project) && ! empty($this->apiKey);
+    }
+
+    /** Project slug aktif (SiteSetting > config). */
+    public function projectSlug(): ?string
+    {
+        return $this->project ?: null;
+    }
+
+    /** Default expiry order dalam menit (SiteSetting > config). */
+    public static function orderExpiryMinutes(): int
+    {
+        $site = SiteSetting::current();
+        $minutes = (int) ($site->pakasir_order_expiry_minutes ?: config('pakasir.order_expiry_minutes', 60));
+
+        return $minutes > 0 ? $minutes : 60;
     }
 
     /**
@@ -45,7 +70,7 @@ class PakasirService
             $url .= '&redirect='.rawurlencode($redirectUrl);
         }
 
-        if (config('pakasir.qris_only')) {
+        if ($this->qrisOnly) {
             $url .= '&qris_only=1';
         }
 
