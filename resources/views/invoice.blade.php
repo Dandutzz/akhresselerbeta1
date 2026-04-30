@@ -108,7 +108,15 @@
                             Rp {{ number_format($order->total_payment, 0, ',', '.') }}
                         </div>
                         <div class="inline-block p-3 bg-white border border-slate-200 rounded-xl shadow-card">
-                            <canvas id="qris-canvas" class="block mx-auto" style="width: 240px; height: 240px;"></canvas>
+                            {{-- Render QR sebagai PNG via api.qrserver.com (sama dengan
+                                 yang dipakai Telegram bot). Tidak butuh JS / CDN library. --}}
+                            <img
+                                src="https://api.qrserver.com/v1/create-qr-code/?size=480x480&margin=10&ecc=M&data={{ urlencode($qris['payment_number']) }}"
+                                alt="QRIS — Rp {{ number_format($order->total_payment, 0, ',', '.') }}"
+                                class="block mx-auto"
+                                style="width: 240px; height: 240px;"
+                                loading="eager"
+                            >
                         </div>
                         <div class="mt-3 text-xs text-slate-500">
                             Scan QR di atas pakai aplikasi e-wallet / m-banking (GoPay, OVO, Dana, BCA, dll).
@@ -118,22 +126,6 @@
                             <textarea readonly class="w-full mt-2 text-[10px] font-mono p-2 border border-slate-200 rounded bg-slate-50 break-all" rows="3">{{ $qris['payment_number'] }}</textarea>
                         </details>
                     </div>
-
-                    {{-- QR rendering pakai library qrcodejs (CDN, no-deps).
-                         Render saat DOMContentLoaded supaya canvas sudah ada. --}}
-                    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-                    <script>
-                        document.addEventListener('DOMContentLoaded', function () {
-                            var canvas = document.getElementById('qris-canvas');
-                            if (!canvas || typeof QRCode === 'undefined') return;
-                            QRCode.toCanvas(canvas, @json($qris['payment_number']), {
-                                width: 240,
-                                margin: 1,
-                                errorCorrectionLevel: 'M',
-                                color: { dark: '#0f172a', light: '#ffffff' },
-                            });
-                        });
-                    </script>
                 @endif
 
                 <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
