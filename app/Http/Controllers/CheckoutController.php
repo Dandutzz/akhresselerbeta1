@@ -13,7 +13,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class CheckoutController extends Controller
@@ -52,6 +51,14 @@ class CheckoutController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        // Tolak user banned (defensif — login juga sudah block, tapi kalau sesi
+        // masih hidup saat di-ban, harus tetap di-block di sini).
+        if (auth()->check() && auth()->user()->is_banned) {
+            auth()->logout();
+
+            return redirect()->route('login')->with('error', 'Akun Anda di-banned. Tidak bisa checkout.');
+        }
+
         $data = $request->validate([
             'product_id' => ['required', 'integer', 'exists:products,id'],
             'product_variant_id' => ['required', 'integer', 'exists:product_variants,id'],
@@ -98,7 +105,7 @@ class CheckoutController extends Controller
 
         $order = DB::transaction(function () use ($variant, $data, $amount, $discount, $fee, $total, $userId, $voucher) {
             $order = Order::create([
-                'order_code' => $this->generateOrderCode(),
+                'order_code' => Order::generateOrderCode(),
                 'user_id' => $userId, // null untuk guest
                 'product_id' => $variant->product_id,
                 'product_variant_id' => $variant->id,
@@ -153,25 +160,4 @@ class CheckoutController extends Controller
         return redirect()->away($paymentUrl);
     }
 
-    protected function generateOrderCode(): string
-    {
-        // Contoh: AKH-20260427-AB12CD. strtoupper menyusutkan charset Str::random
-        // jadi 36 (A-Z + 0-9) — collision sangat tidak mungkin tapi mungkin.
-        // Retry 5x baru fallback ke 10 char (search space jauh lebih besar)
-        // supaya checkout user tidak 500 kalau kebetulan tabrakan.
-        for ($i = 0; $i < 5; $i++) {
-            $code = 'AKH-'.now()->format('Ymd').'-'.strtoupper(Str::random(6));
-            if (! Order::where('order_code', $code)->exists()) {
-                return $code;
-            }
-        }
-
-        // Fallback 10-char tetap loop sampai unik supaya gak ada celah 500
-        // dari unique constraint violation, walau probabilitas hampir 0.
-        do {
-            $fallback = 'AKH-'.now()->format('Ymd').'-'.strtoupper(Str::random(10));
-        } while (Order::where('order_code', $fallback)->exists());
-
-        return $fallback;
-    }
 }

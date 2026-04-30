@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Str;
 
 class Order extends Model
 {
@@ -105,5 +106,26 @@ class Order extends Model
     public function isPending(): bool
     {
         return $this->status === self::STATUS_PENDING;
+    }
+
+    /**
+     * Generate order_code unik (AKH-YYYYMMDD-XXXXXX). Dipakai oleh checkout
+     * web, cart, dan Telegram bot. Retry 5x di charset 36, fallback 10-char
+     * supaya gak ada celah unique-constraint 500.
+     */
+    public static function generateOrderCode(): string
+    {
+        for ($i = 0; $i < 5; $i++) {
+            $code = 'AKH-'.now()->format('Ymd').'-'.strtoupper(Str::random(6));
+            if (! self::where('order_code', $code)->exists()) {
+                return $code;
+            }
+        }
+
+        do {
+            $fallback = 'AKH-'.now()->format('Ymd').'-'.strtoupper(Str::random(10));
+        } while (self::where('order_code', $fallback)->exists());
+
+        return $fallback;
     }
 }

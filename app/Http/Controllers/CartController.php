@@ -15,7 +15,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -154,6 +153,13 @@ class CartController extends Controller
      */
     public function checkoutAll(Request $request): RedirectResponse
     {
+        // Tolak user banned.
+        if (Auth::check() && Auth::user()->is_banned) {
+            Auth::logout();
+
+            return redirect()->route('login')->with('error', 'Akun Anda di-banned. Tidak bisa checkout.');
+        }
+
         $data = $request->validate([
             'customer_email' => ['required', 'email', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:32', 'regex:/^[0-9+\- ]+$/'],
@@ -211,7 +217,7 @@ class CartController extends Controller
 
         $order = DB::transaction(function () use ($items, $lineTotals, $user, $data, $subtotal, $discount, $fee, $total, $voucher, $firstVariant) {
             $order = Order::create([
-                'order_code' => $this->generateOrderCode(),
+                'order_code' => Order::generateOrderCode(),
                 'user_id' => $user->id,
                 // Order tetap simpan product_id/variant_id pertama sebagai
                 // ringkasan (kompatibel dengan Filament resource & invoice
@@ -280,18 +286,4 @@ class CartController extends Controller
         return redirect()->away($paymentUrl);
     }
 
-    protected function generateOrderCode(): string
-    {
-        for ($i = 0; $i < 5; $i++) {
-            $code = 'AKH-'.now()->format('Ymd').'-'.strtoupper(Str::random(6));
-            if (! Order::where('order_code', $code)->exists()) {
-                return $code;
-            }
-        }
-        do {
-            $fallback = 'AKH-'.now()->format('Ymd').'-'.strtoupper(Str::random(10));
-        } while (Order::where('order_code', $fallback)->exists());
-
-        return $fallback;
-    }
 }

@@ -22,6 +22,7 @@
                             ['account.index', 'Dashboard', '🏠'],
                             ['account.orders.index', 'History Pesanan', '📦'],
                             ['account.profile', 'Profil & Password', '⚙️'],
+                            ['account.telegram.show', 'Hubungkan Telegram', '✈️'],
                         ];
                     @endphp
                     @foreach ($items as [$route, $label, $icon])

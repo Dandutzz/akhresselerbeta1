@@ -10,6 +10,7 @@ use App\Http\Controllers\FrontController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PakasirWebhookController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\TelegramBotController;
 use Illuminate\Support\Facades\Route;
 
 // ======== Publik (frontend toko) ========
@@ -45,6 +46,11 @@ Route::post('/webhooks/pakasir', [PakasirWebhookController::class, 'handle'])
 Route::post('/webhooks/fonnte', [FonnteWebhookController::class, 'handle'])
     ->middleware('throttle:120,1')
     ->name('webhooks.fonnte');
+
+// Webhook dari Telegram Bot — secret di URL untuk auth.
+Route::post('/webhooks/telegram/{secret}', [TelegramBotController::class, 'webhook'])
+    ->middleware('throttle:300,1')
+    ->name('webhooks.telegram');
 
 // ======== Auth (login / register / lupa password) ========
 // Rate limit ketat utk cegah brute-force.
@@ -85,6 +91,11 @@ Route::middleware('auth')->prefix('akun')->name('account.')->group(function () {
     Route::get('/orders/{orderCode}/review', [ReviewController::class, 'create'])->name('reviews.create');
     Route::post('/orders/{orderCode}/review', [ReviewController::class, 'store'])
         ->middleware('throttle:10,1')->name('reviews.store');
+
+    // Linking Telegram Bot ke akun
+    Route::get('/telegram', [TelegramBotController::class, 'showLinkPage'])->name('telegram.show');
+    Route::post('/telegram/generate', [TelegramBotController::class, 'generateToken'])->name('telegram.generate');
+    Route::post('/telegram/unlink', [TelegramBotController::class, 'unlink'])->name('telegram.unlink');
 });
 
 // ======== Cart (hanya user login — guest pakai checkout instan) ========

@@ -44,7 +44,22 @@ class AuthController extends Controller
                 ->withErrors(['email' => 'Email atau password salah.']);
         }
 
+        // Cek banned: kalau user di-ban, langsung logout + tampilkan alasan.
+        if (Auth::user()->is_banned) {
+            $reason = Auth::user()->ban_reason ?: 'Akun dinonaktifkan oleh admin.';
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => 'Akun di-banned: '.$reason]);
+        }
+
         $request->session()->regenerate();
+
+        // Update last_login_at (untuk monitoring di User Management).
+        Auth::user()->forceFill(['last_login_at' => now()])->save();
 
         // Pastikan history order guest dengan email yang sama tergabung.
         $linked = Auth::user()->linkGuestOrders();

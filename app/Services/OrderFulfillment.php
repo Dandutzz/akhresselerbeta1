@@ -102,8 +102,17 @@ class OrderFulfillment
         // Auto-kirim kredensial via Fonnte WA — di luar transaction supaya HTTP call
         // tidak block lock DB. Service handle exception sendiri (return false, gak throw).
         if ($result && $assignedStock) {
-            $fresh = $order->fresh(['stock', 'product', 'variant', 'items.stock', 'items.product', 'items.variant']);
+            $fresh = $order->fresh(['stock', 'product', 'variant', 'user', 'items.stock', 'items.product', 'items.variant']);
             app(FonnteWhatsApp::class)->sendCredentials($fresh);
+
+            // Auto-kirim ke Telegram juga kalau user linked.
+            if ($fresh && $fresh->user && $fresh->user->telegram_chat_id) {
+                try {
+                    app(TelegramBotService::class)->sendCredentialsForOrder($fresh);
+                } catch (\Throwable $e) {
+                    \Log::error('Telegram sendCredentials failed', ['order' => $fresh->id, 'error' => $e->getMessage()]);
+                }
+            }
         }
 
         return $result;
