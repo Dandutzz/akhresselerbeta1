@@ -156,39 +156,49 @@ class PakasirService
             return null;
         }
 
-        try {
-            $response = Http::timeout(10)
-                ->acceptJson()
-                ->get($this->baseUrl.'/api/transactiondetail', [
-                    'project' => $this->project,
-                    'amount' => $amount,
-                    'order_id' => $orderCode,
-                    'api_key' => $this->apiKey,
+        // Workaround bug Pakasir sandbox: untuk order_id tertentu (sering yang
+        // mengandung angka di awal segmen), endpoint case-sensitive dan return
+        // 404 untuk versi uppercase. Coba versi original dulu, fallback ke
+        // lowercase. Tested: uppercase 'AKH-20260430-1NTYFY' → 404, lowercase
+        // 'akh-20260430-1ntyfy' → return transaction yang sama.
+        $candidates = array_unique([$orderCode, strtolower($orderCode)]);
+
+        foreach ($candidates as $candidate) {
+            try {
+                $response = Http::timeout(10)
+                    ->acceptJson()
+                    ->get($this->baseUrl.'/api/transactiondetail', [
+                        'project' => $this->project,
+                        'amount' => $amount,
+                        'order_id' => $candidate,
+                        'api_key' => $this->apiKey,
+                    ]);
+            } catch (\Throwable $e) {
+                Log::error('Pakasir transactiondetail error', [
+                    'order_code' => $candidate,
+                    'message' => $e->getMessage(),
                 ]);
-        } catch (\Throwable $e) {
-            Log::error('Pakasir transactiondetail error', [
-                'order_code' => $orderCode,
-                'message' => $e->getMessage(),
-            ]);
 
-            return null;
+                continue;
+            }
+
+            if (! $response->successful()) {
+                Log::warning('Pakasir transactiondetail non-success', [
+                    'order_code' => $candidate,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+
+                continue;
+            }
+
+            $json = $response->json();
+            if (is_array($json) && isset($json['transaction']) && is_array($json['transaction'])) {
+                return $json['transaction'];
+            }
         }
 
-        if (! $response->successful()) {
-            Log::warning('Pakasir transactiondetail non-success', [
-                'order_code' => $orderCode,
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
-
-            return null;
-        }
-
-        $json = $response->json();
-
-        return is_array($json) && isset($json['transaction']) && is_array($json['transaction'])
-            ? $json['transaction']
-            : null;
+        return null;
     }
 
     /**
