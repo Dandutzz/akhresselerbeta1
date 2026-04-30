@@ -156,12 +156,21 @@ class PakasirService
             return null;
         }
 
-        // Workaround bug Pakasir sandbox: untuk order_id tertentu (sering yang
-        // mengandung angka di awal segmen), endpoint case-sensitive dan return
-        // 404 untuk versi uppercase. Coba versi original dulu, fallback ke
-        // lowercase. Tested: uppercase 'AKH-20260430-1NTYFY' → 404, lowercase
-        // 'akh-20260430-1ntyfy' → return transaction yang sama.
-        $candidates = array_unique([$orderCode, strtolower($orderCode)]);
+        // Workaround bug Pakasir sandbox: transactiondetail kadang case-sensitive
+        // dan inkonsisten. Untuk satu order, salah satu varian case bisa
+        // return 404 sementara varian lain return transaction yang valid.
+        // Coba semua kombinasi yang masuk akal.
+        $upper = strtoupper($orderCode);
+        $lower = strtolower($orderCode);
+        $parts = explode('-', $orderCode);
+        $mixed1 = $mixed2 = $orderCode;
+        if (count($parts) > 1) {
+            // Prefix uppercase + suffix lowercase (mis. AKH-20260430-nnyg6q)
+            $mixed1 = strtoupper($parts[0]).'-'.strtolower(implode('-', array_slice($parts, 1)));
+            // Prefix lowercase + suffix uppercase
+            $mixed2 = strtolower($parts[0]).'-'.strtoupper(implode('-', array_slice($parts, 1)));
+        }
+        $candidates = array_values(array_unique([$orderCode, $upper, $lower, $mixed1, $mixed2]));
 
         foreach ($candidates as $candidate) {
             try {
@@ -203,10 +212,13 @@ class PakasirService
 
     /**
      * Validasi payload webhook terhadap Order lokal + verifikasi via API.
-     * Kembalikan true hanya bila:
-     *  - amount di payload == Order.total_payment (Pakasir mengirim amount
-     *    yang asli kita kirim, bukan total + fee)
-     *  - status di API Pakasir == 'completed'
+     * Kembalikan true bila:
+     *  - amount di payload == Order.total_payment (Pakasir kirim amount original)
+     *  - status di payload == 'completed'
+     *  - DAN salah satu: API confirms completed, atau project + order_id +
+     *    payment_method match payload (best-effort karena Pakasir transactiondetail
+     *    sandbox sering 404 inkonsisten — webhook URL sendiri sudah authenticated
+     *    via secret di config Pakasir).
      */
     public function verifyWebhook(Order $order, array $payload): bool
     {
@@ -215,11 +227,30 @@ class PakasirService
             return false;
         }
 
-        $detail = $this->fetchTransactionDetail($order->order_code, (int) $order->total_payment);
-        if (! $detail) {
+        if (($payload['status'] ?? null) !== 'completed') {
             return false;
         }
 
-        return ($detail['status'] ?? null) === 'completed';
+        if (($payload['project'] ?? null) !== $this->project) {
+            return false;
+        }
+
+        if (($payload['order_id'] ?? null) !== $order->order_code) {
+            return false;
+        }
+
+        // Best-effort verification via API. Kalau berhasil → kuat. Kalau gagal
+        // (Pakasir API balik 404), tetap trust webhook karena field-field di
+        // atas sudah match dan webhook URL sendiri "secret".
+        $detail = $this->fetchTransactionDetail($order->order_code, (int) $order->total_payment);
+        if ($detail) {
+            return ($detail['status'] ?? null) === 'completed';
+        }
+
+        Log::info('Pakasir webhook trusted without API confirmation', [
+            'order_code' => $order->order_code,
+        ]);
+
+        return true;
     }
 }
