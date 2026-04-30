@@ -290,6 +290,7 @@ class TelegramBotService
         $page = max(1, min($page, $totalPages));
 
         $products = Product::query()
+            ->orderBy('sort_order', 'asc')
             ->orderBy('name')
             ->skip(($page - 1) * $perPage)
             ->take($perPage)

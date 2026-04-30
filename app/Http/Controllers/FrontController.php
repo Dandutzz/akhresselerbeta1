@@ -30,6 +30,7 @@ class FrontController extends Controller
                 ]),
                 'variants.activeFlashsales',
             ])
+            ->orderBy('sort_order', 'asc')
             ->orderBy('is_best_seller', 'desc')
             ->orderBy('sold_count', 'desc')
             ->orderBy('name');
