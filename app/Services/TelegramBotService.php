@@ -990,10 +990,6 @@ class TelegramBotService
         $firstVariantName = $first->variant?->name ?? '';
         $totalQty = (int) $items->sum('qty');
         $accountsAssigned = $items->filter(fn ($i) => $i->stock)->sum('qty');
-        $payId = (string) ($order->pakasir_payment_number ?? $order->payment_qr_string ?? 'undefined');
-        if (strlen($payId) > 24) {
-            $payId = substr($payId, 0, 8).'…'.substr($payId, -8);
-        }
         $price = (int) ($order->amount ?? $order->total_payment);
         $fee = (int) ($order->fee ?? 0);
         $totalDibayar = $price + $fee;
@@ -1002,8 +998,7 @@ class TelegramBotService
 
         $text = "╭────〔 <b>TRANSAKSI SUKSES</b> 〕─\n";
         $text .= "\n";
-        $text .= '┊・Pay ID : '.htmlspecialchars($payId)."\n";
-        $text .= '┊・Kode Unik : <code>'.htmlspecialchars($order->order_code)."</code>\n";
+        $text .= '┊・Invoice ID : <code>'.htmlspecialchars($order->order_code)."</code>\n";
         $text .= '┊・Nama Produk : '.htmlspecialchars($firstProductName)."\n";
         $text .= '┊・Nama Variasi : '.htmlspecialchars($firstVariantName)."\n";
         $text .= "┊・ID Buyer : {$order->user->id}\n";
