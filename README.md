@@ -4,7 +4,7 @@ Toko digital untuk penjualan akun premium (Netflix, CapCut, Spotify, dll) dengan
 auto-delivery kredensial setelah pembayaran sukses lewat **Pakasir Payment
 Gateway** (QRIS, Virtual Account, E-Wallet).
 
-Stack: Laravel 13 · Filament 5 · PHP 8.3 · Tailwind (CDN) · SQLite/MySQL.
+Stack: Laravel 13 · Filament 5 · PHP 8.3 · Tailwind (CDN) · MySQL 8 / MariaDB 10.6+.
 
 ## Fitur
 
@@ -40,11 +40,22 @@ Stack: Laravel 13 · Filament 5 · PHP 8.3 · Tailwind (CDN) · SQLite/MySQL.
 
 ## Setup
 
+Database default sekarang **MySQL**. Pastikan MySQL 8 / MariaDB 10.6+ aktif,
+lalu siapkan database & user (sesuaikan password):
+
+```bash
+mysql -uroot -p -e "CREATE DATABASE akhpremium CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -uroot -p -e "CREATE USER 'akhpremium'@'localhost' IDENTIFIED BY 'ganti_password_kuat';"
+mysql -uroot -p -e "GRANT ALL PRIVILEGES ON akhpremium.* TO 'akhpremium'@'localhost'; FLUSH PRIVILEGES;"
+```
+
+Lalu install aplikasinya:
+
 ```bash
 composer install
 cp .env.example .env
 php artisan key:generate
-touch database/database.sqlite
+# isi DB_DATABASE / DB_USERNAME / DB_PASSWORD di .env sesuai kredensial di atas
 php artisan migrate --seed
 ```
 
